@@ -1,0 +1,715 @@
+{
+  "sourceUrl": "https://www.yuque.com/cdek/api2",
+  "generatedAt": "2026-04-28T08:30:52.224Z",
+  "book": {
+    "id": 861916,
+    "slug": "api2",
+    "name": "API 2.0版本文档",
+    "description": "API 2.0版本文档",
+    "tocUpdatedAt": "2025-08-14T11:40:16.000Z",
+    "updatedAt": "2026-01-19T02:07:52.000Z",
+    "contentUpdatedAt": "2026-01-19T02:07:51.927Z",
+    "itemsCount": 23
+  },
+  "toc": [
+    {
+      "type": "DOC",
+      "title": "客户授权",
+      "slug": "authorization",
+      "level": 0,
+      "id": 5364209,
+      "parentUuid": null
+    },
+    {
+      "type": "TITLE",
+      "title": "下单",
+      "slug": null,
+      "level": 0,
+      "id": null,
+      "parentUuid": null
+    },
+    {
+      "type": "DOC",
+      "title": "申请下单请求",
+      "slug": "order-request",
+      "level": 1,
+      "id": 5355637,
+      "parentUuid": "861916:wwe9sw9g93sm3kxl"
+    },
+    {
+      "type": "DOC",
+      "title": "获取订单信息",
+      "slug": "order-info",
+      "level": 1,
+      "id": 5641414,
+      "parentUuid": "861916:wwe9sw9g93sm3kxl"
+    },
+    {
+      "type": "DOC",
+      "title": "修改订单接口",
+      "slug": "order-update",
+      "level": 1,
+      "id": 75904439,
+      "parentUuid": "861916:wwe9sw9g93sm3kxl"
+    },
+    {
+      "type": "DOC",
+      "title": "取消订单",
+      "slug": "order-request-cancel",
+      "level": 1,
+      "id": 5652188,
+      "parentUuid": "861916:wwe9sw9g93sm3kxl"
+    },
+    {
+      "type": "DOC",
+      "title": "取件申请",
+      "slug": "aql1bkxggnt0mpvg",
+      "level": 0,
+      "id": 232293640,
+      "parentUuid": null
+    },
+    {
+      "type": "DOC",
+      "title": "获取快递员上门取件可用日期（针对货到付款）",
+      "slug": "tgfb0hy8qh1gm8vx",
+      "level": 1,
+      "id": 232302936,
+      "parentUuid": "HPFVqNZPJo6ASsAG"
+    },
+    {
+      "type": "DOC",
+      "title": "注册快递员上门取件申请",
+      "slug": "tzaklkr6vw4rn0xm",
+      "level": 1,
+      "id": 232286802,
+      "parentUuid": "HPFVqNZPJo6ASsAG"
+    },
+    {
+      "type": "DOC",
+      "title": "获取申请信息（通过 UUID）",
+      "slug": "xleu2p9amyybzfvc",
+      "level": 1,
+      "id": 232293091,
+      "parentUuid": "HPFVqNZPJo6ASsAG"
+    },
+    {
+      "type": "DOC",
+      "title": "修改取件申请的状态",
+      "slug": "ex38lg91drsygye9",
+      "level": 1,
+      "id": 232402868,
+      "parentUuid": "HPFVqNZPJo6ASsAG"
+    },
+    {
+      "type": "DOC",
+      "title": "删除取件申请",
+      "slug": "cbwrmvx0nc40yfnb",
+      "level": 1,
+      "id": 232295468,
+      "parentUuid": "HPFVqNZPJo6ASsAG"
+    },
+    {
+      "type": "TITLE",
+      "title": "打印面单",
+      "slug": null,
+      "level": 0,
+      "id": null,
+      "parentUuid": null
+    },
+    {
+      "type": "DOC",
+      "title": "申请生成面单",
+      "slug": "barcode-create",
+      "level": 1,
+      "id": 6275389,
+      "parentUuid": "861916:zzs4e27al8stf46p"
+    },
+    {
+      "type": "DOC",
+      "title": "获取面单",
+      "slug": "barcode_receive",
+      "level": 1,
+      "id": 6277701,
+      "parentUuid": "861916:zzs4e27al8stf46p"
+    },
+    {
+      "type": "TITLE",
+      "title": "计算器",
+      "slug": null,
+      "level": 0,
+      "id": null,
+      "parentUuid": null
+    },
+    {
+      "type": "DOC",
+      "title": "按照费率代码获取运费",
+      "slug": "tariff_code_calc",
+      "level": 1,
+      "id": 201719432,
+      "parentUuid": "LVgJ2YXpcv5CwPK3"
+    },
+    {
+      "type": "DOC",
+      "title": "获取可以使用的服务列表",
+      "slug": "available_tariff",
+      "level": 1,
+      "id": 201813628,
+      "parentUuid": "LVgJ2YXpcv5CwPK3"
+    },
+    {
+      "type": "DOC",
+      "title": "获取城市列表",
+      "slug": "cities",
+      "level": 0,
+      "id": 200213722,
+      "parentUuid": null
+    },
+    {
+      "type": "DOC",
+      "title": "获取服务网点列表",
+      "slug": "pick-up-points",
+      "level": 0,
+      "id": 5801104,
+      "parentUuid": null
+    },
+    {
+      "type": "DOC",
+      "title": "查看轨迹",
+      "slug": "tracing",
+      "level": 0,
+      "id": 206637839,
+      "parentUuid": null
+    },
+    {
+      "type": "TITLE",
+      "title": "附件",
+      "slug": null,
+      "level": 0,
+      "id": null,
+      "parentUuid": null
+    },
+    {
+      "type": "DOC",
+      "title": "轨迹列表",
+      "slug": "statuses",
+      "level": 1,
+      "id": 230516929,
+      "parentUuid": "dqvxlSvIQ6e3xsZe"
+    },
+    {
+      "type": "DOC",
+      "title": "服务列表",
+      "slug": "tariff_codes",
+      "level": 1,
+      "id": 178934780,
+      "parentUuid": "dqvxlSvIQ6e3xsZe"
+    },
+    {
+      "type": "DOC",
+      "title": "货币列表",
+      "slug": "currency",
+      "level": 1,
+      "id": 201807913,
+      "parentUuid": "dqvxlSvIQ6e3xsZe"
+    },
+    {
+      "type": "DOC",
+      "title": "运输模式列表",
+      "slug": "delivery_modes",
+      "level": 1,
+      "id": 201822209,
+      "parentUuid": "dqvxlSvIQ6e3xsZe"
+    }
+  ],
+  "docs": [
+    {
+      "id": 5364209,
+      "slug": "authorization",
+      "title": "客户授权",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/authorization",
+      "wordCount": 234,
+      "updatedAt": "2025-07-14T04:22:23.000Z",
+      "publishedAt": "2025-07-14T04:22:23.000Z",
+      "textLength": 2760,
+      "endpoints": [
+        "https://api.cdek.ru/v2/oauth/token?parameters",
+        "https://api.edu.cdek.ru/v2/oauth/token?parameters",
+        "https://api.edu.cdek.ru/v2/oauth/token?parameters'"
+      ],
+      "headings": [],
+      "codeBlockCount": 3,
+      "firstParagraph": "POST请求， 请求URL\n 测试环境\n | https://api.edu.cdek.ru/v2/oauth/token?parameters\n |\n 正式环境\n | https://api.cdek.ru/v2/oauth/token?parameters\n |\n 请求内容格式\n | application/x-www-form-urlencoded\n |"
+    },
+    {
+      "id": 5355637,
+      "slug": "order-request",
+      "title": "申请下单请求",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/order-request",
+      "wordCount": 3622,
+      "updatedAt": "2025-07-04T05:19:32.000Z",
+      "publishedAt": "2025-07-04T05:19:32.000Z",
+      "textLength": 12401,
+      "endpoints": [
+        "http://api.cdek.ru/v2/oauth/token'",
+        "https://api.cdek.ru/v2/orders',"
+      ],
+      "headings": [
+        {
+          "level": 2,
+          "title": "下单请求"
+        },
+        {
+          "level": 3,
+          "title": "请求内容"
+        },
+        {
+          "level": 3,
+          "title": "申请下单请求例子"
+        },
+        {
+          "level": 3,
+          "title": "Python3 申请下单请求例子"
+        },
+        {
+          "level": 4,
+          "title": "申请成功返回的数据"
+        },
+        {
+          "level": 4,
+          "title": "申请失败返回的数据"
+        },
+        {
+          "level": 3,
+          "title": "常见异常"
+        },
+        {
+          "level": 3,
+          "title": "附件"
+        },
+        {
+          "level": 4,
+          "title": "国家以及对应的币种"
+        },
+        {
+          "level": 4,
+          "title": "附加服务"
+        },
+        {
+          "level": 4,
+          "title": "材质列表"
+        }
+      ],
+      "codeBlockCount": 4,
+      "firstParagraph": "申请下单请求不返回运单号，为了获取运单号需要使用 申请下单请求 返回的请求UUID（ entity.uuid ）提交到 获取下单请求结果 的接口。"
+    },
+    {
+      "id": 5641414,
+      "slug": "order-info",
+      "title": "获取订单信息",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/order-info",
+      "wordCount": 4501,
+      "updatedAt": "2024-11-16T09:13:11.000Z",
+      "publishedAt": "2024-06-26T03:25:25.000Z",
+      "textLength": 16762,
+      "endpoints": [
+        "https://api.cdek.ru/v2/orders/{entity_uuid}'"
+      ],
+      "headings": [
+        {
+          "level": 2,
+          "title": "获取下单结果"
+        },
+        {
+          "level": 3,
+          "title": "请求内容"
+        },
+        {
+          "level": 3,
+          "title": "返回的数据描述"
+        },
+        {
+          "level": 3,
+          "title": "返回的数据例子1"
+        },
+        {
+          "level": 3,
+          "title": "返回的数据例子2"
+        },
+        {
+          "level": 2,
+          "title": "常见异常"
+        },
+        {
+          "level": 2,
+          "title": "订单状态描述"
+        },
+        {
+          "level": 3,
+          "title": "附加状态描述"
+        }
+      ],
+      "codeBlockCount": 3,
+      "firstParagraph": "下单结果接口接收申请下单接口返回的  entity.uuid 值，返回申请下单请求提交的数据以及下单结果。\n 获取下单结果"
+    },
+    {
+      "id": 75904439,
+      "slug": "order-update",
+      "title": "修改订单接口",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/order-update",
+      "wordCount": 2240,
+      "updatedAt": "2024-06-26T03:25:55.000Z",
+      "publishedAt": "2024-06-26T03:25:55.000Z",
+      "textLength": 8747,
+      "endpoints": [
+        "https://api.edu.cdek.ru/v2/orders"
+      ],
+      "headings": [
+        {
+          "level": 3,
+          "title": "请求内容"
+        },
+        {
+          "level": 4,
+          "title": "申请返回的数据"
+        }
+      ],
+      "codeBlockCount": 0,
+      "firstParagraph": "通过该接口可以修改存在的订单\n 更改订单的条件是 CDEK 仓库中没有货物移动（即订单状态为“已创建”）\n 请求方式 Update-request\n 请求内容格式为 JSON (Content-Type: application/json) .\n 需要使用 PATCH-请求， 请求URL:\n 测试环境\n | ​ https://api.edu.cdek.ru/v2/orders\n |\n 正式环境\n | https://api.cdek.ru /v2/orders\n |"
+    },
+    {
+      "id": 5652188,
+      "slug": "order-request-cancel",
+      "title": "取消订单",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/order-request-cancel",
+      "wordCount": 752,
+      "updatedAt": "2024-06-26T03:26:15.000Z",
+      "publishedAt": "2024-06-26T03:26:15.000Z",
+      "textLength": 4432,
+      "endpoints": [
+        "https://api.cdek.ru/v2/orders/{entity_uuid}'",
+        "https://api.cdek.ru/v2/orders/{entity_uuid}',"
+      ],
+      "headings": [
+        {
+          "level": 3,
+          "title": "返回的内容"
+        }
+      ],
+      "codeBlockCount": 4,
+      "firstParagraph": "仅“已办理”状态的订单可以删除，已经入仓过的订单无法通过该接口取消。"
+    },
+    {
+      "id": 232293640,
+      "slug": "aql1bkxggnt0mpvg",
+      "title": "取件申请",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/aql1bkxggnt0mpvg",
+      "wordCount": 0,
+      "updatedAt": "2025-09-03T10:03:14.000Z",
+      "publishedAt": "2025-08-13T11:52:50.000Z",
+      "textLength": 0,
+      "endpoints": [],
+      "headings": [],
+      "codeBlockCount": 0,
+      "firstParagraph": ""
+    },
+    {
+      "id": 232302936,
+      "slug": "tgfb0hy8qh1gm8vx",
+      "title": "获取快递员上门取件可用日期（针对货到付款）",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/tgfb0hy8qh1gm8vx",
+      "wordCount": 437,
+      "updatedAt": "2025-08-24T03:18:17.000Z",
+      "publishedAt": "2025-08-14T11:39:34.000Z",
+      "textLength": 1692,
+      "endpoints": [
+        "https://api.cdek.ru/v2/intakes/",
+        "https://api.edu.cdek.ru/v2/intakes/"
+      ],
+      "headings": [],
+      "codeBlockCount": 2,
+      "firstParagraph": "此方法可让您获取快递员从在线商店仓库取货的日期，该日期为仓库所在地区。\n 鉴权方式 bearerAuth\n POST -请求， 请求URL:\n 测试环境\n | https://api.edu.cdek.ru/v2/intakes/ availableDays\n |\n 正式环境\n | https://api.cdek.ru/v2/intakes/ availableDays\n |"
+    },
+    {
+      "id": 232286802,
+      "slug": "tzaklkr6vw4rn0xm",
+      "title": "注册快递员上门取件申请",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/tzaklkr6vw4rn0xm",
+      "wordCount": 1080,
+      "updatedAt": "2025-08-14T12:14:06.000Z",
+      "publishedAt": "2025-08-14T12:14:05.000Z",
+      "textLength": 4728,
+      "endpoints": [
+        "https://api.cdek.ru/v2/intakes",
+        "https://api.edu.cdek.ru/v2/intakes"
+      ],
+      "headings": [
+        {
+          "level": 3,
+          "title": "响应状态码"
+        }
+      ],
+      "codeBlockCount": 2,
+      "firstParagraph": "该接口用于呼叫快递员从电商仓库上门取货，并送至 CDEK 仓库。\n建议：上门时间区间最少为 3 小时。"
+    },
+    {
+      "id": 232293091,
+      "slug": "xleu2p9amyybzfvc",
+      "title": "获取申请信息（通过 UUID）",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/xleu2p9amyybzfvc",
+      "wordCount": 307,
+      "updatedAt": "2025-08-14T12:17:17.000Z",
+      "publishedAt": "2025-08-14T12:17:17.000Z",
+      "textLength": 2780,
+      "endpoints": [
+        "https://api.cdek.ru/v2/intakes/{uuid}",
+        "https://api.edu.cdek.ru/v2/intakes/{uuid}"
+      ],
+      "headings": [
+        {
+          "level": 3,
+          "title": "返回的数据"
+        }
+      ],
+      "codeBlockCount": 1,
+      "firstParagraph": "GET -请求， 请求URL:\n 测试环境\n | https://api.edu.cdek.ru/v2/intakes/{uuid}\n |\n 正式环境\n | https://api.cdek.ru/v2/intakes/{uuid}\n |"
+    },
+    {
+      "id": 232402868,
+      "slug": "ex38lg91drsygye9",
+      "title": "修改取件申请的状态",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/ex38lg91drsygye9",
+      "wordCount": 963,
+      "updatedAt": "2025-08-14T11:43:49.000Z",
+      "publishedAt": "2025-08-14T08:28:03.000Z",
+      "textLength": 5084,
+      "endpoints": [],
+      "headings": [],
+      "codeBlockCount": 3,
+      "firstParagraph": "PATCH -请求，请求URL:\n ​ 测试环境"
+    },
+    {
+      "id": 232295468,
+      "slug": "cbwrmvx0nc40yfnb",
+      "title": "删除取件申请",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/cbwrmvx0nc40yfnb",
+      "wordCount": 400,
+      "updatedAt": "2025-08-14T06:26:43.000Z",
+      "publishedAt": "2025-08-13T13:30:58.000Z",
+      "textLength": 1490,
+      "endpoints": [
+        "https://api.cdek.ru/v2/intakes/72753031-0525-4aa4-9629-d6ae52e825f5",
+        "https://api.cdek.ru/v2/intakes/{uuid}",
+        "https://api.edu.cdek.ru/v2/intakes/{uuid}"
+      ],
+      "headings": [
+        {
+          "level": 3,
+          "title": "响应状态码"
+        }
+      ],
+      "codeBlockCount": 2,
+      "firstParagraph": "该方法用于删除快递员上门取件的申请。 通过接口集成，可在非最终状态的任何状态下删除申请。\n 授权方式： bearerAuth\n 测试环境\n | https://api.edu.cdek.ru/v2/intakes/{uuid}\n |\n 正式环境\n | https://api.cdek.ru/v2/intakes/{uuid}\n |"
+    },
+    {
+      "id": 6275389,
+      "slug": "barcode-create",
+      "title": "申请生成面单",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/barcode-create",
+      "wordCount": 397,
+      "updatedAt": "2024-06-26T03:26:27.000Z",
+      "publishedAt": "2024-06-26T03:26:27.000Z",
+      "textLength": 1750,
+      "endpoints": [],
+      "headings": [
+        {
+          "level": 2,
+          "title": "请求参数"
+        },
+        {
+          "level": 3,
+          "title": "请求内容"
+        },
+        {
+          "level": 3,
+          "title": "返回内容"
+        }
+      ],
+      "codeBlockCount": 2,
+      "firstParagraph": "通过该接口可以申请生成面单"
+    },
+    {
+      "id": 6277701,
+      "slug": "barcode_receive",
+      "title": "获取面单",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/barcode_receive",
+      "wordCount": 752,
+      "updatedAt": "2024-06-26T03:26:39.000Z",
+      "publishedAt": "2024-06-26T03:26:38.000Z",
+      "textLength": 3309,
+      "endpoints": [
+        "http://api.cdek.ru/v2/print/barcodes/72753034-c617-46ef-b70a-8f5f520b6be4.pdf\",",
+        "https://api.cdek.ru/v2/print/barcodes/{uuid}",
+        "https://api.cdek.ru/v2/print/barcodes/{uuid}.pdf",
+        "https://api.edu.cdek.ru/v2/print/barcodes/{uuid}"
+      ],
+      "headings": [
+        {
+          "level": 2,
+          "title": "下单请求"
+        },
+        {
+          "level": 2,
+          "title": "返回内容"
+        },
+        {
+          "level": 2,
+          "title": "状态编码"
+        },
+        {
+          "level": 2,
+          "title": "返回内容例子"
+        }
+      ],
+      "codeBlockCount": 1,
+      "firstParagraph": "通过该接口可以获取已经生成好的面单"
+    },
+    {
+      "id": 201719432,
+      "slug": "tariff_code_calc",
+      "title": "按照费率代码获取运费",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/tariff_code_calc",
+      "wordCount": 573,
+      "updatedAt": "2025-01-08T10:00:15.000Z",
+      "publishedAt": "2025-01-08T09:27:26.000Z",
+      "textLength": 2709,
+      "endpoints": [
+        "https://api.cdek.ru/v2/calculator/tariff",
+        "https://api.edu.cdek.ru/v2/calculator/tariff"
+      ],
+      "headings": [],
+      "codeBlockCount": 2,
+      "firstParagraph": "POST请求， 请求URL\n 测试环境\n | https://api.edu.cdek.ru/v2/calculator/tariff\n |\n 正式环境\n | https://api.cdek.ru/v2/calculator/tariff\n |"
+    },
+    {
+      "id": 201813628,
+      "slug": "available_tariff",
+      "title": "获取可以使用的服务列表",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/available_tariff",
+      "wordCount": 979,
+      "updatedAt": "2025-01-08T09:22:59.000Z",
+      "publishedAt": "2025-01-08T09:22:58.000Z",
+      "textLength": 5281,
+      "endpoints": [
+        "https://api.cdek.ru/v2/calculator/tarifflist",
+        "https://api.edu.cdek.ru/v2/calculator/tarifflist"
+      ],
+      "headings": [],
+      "codeBlockCount": 2,
+      "firstParagraph": "POST请求， 请求URL\n 测试环境\n | https://api.edu.cdek.ru/v2/calculator/tarifflist\n |\n 正式环境\n | https://api.cdek.ru/v2/calculator/tarifflist\n |"
+    },
+    {
+      "id": 200213722,
+      "slug": "cities",
+      "title": "获取城市列表",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/cities",
+      "wordCount": 347,
+      "updatedAt": "2025-02-19T09:34:05.000Z",
+      "publishedAt": "2025-01-08T09:37:21.000Z",
+      "textLength": 1882,
+      "endpoints": [
+        "https://api.cdek.ru/v2/location/cities?postal_code=198261&lang=zho",
+        "https://api.edu.cdek.ru/v2/location/cities"
+      ],
+      "headings": [],
+      "codeBlockCount": 1,
+      "firstParagraph": "GET请求， 请求URL\n 测试环境\n | https://api.edu.cdek.ru/v2/location/cities\n |\n 正式环境\n | https://api .cdek.ru/v2/ location/cities\n |"
+    },
+    {
+      "id": 5801104,
+      "slug": "pick-up-points",
+      "title": "获取服务网点列表",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/pick-up-points",
+      "wordCount": 698,
+      "updatedAt": "2024-12-26T09:05:19.000Z",
+      "publishedAt": "2024-06-26T03:26:51.000Z",
+      "textLength": 3246,
+      "endpoints": [
+        "https://api.cdek.ru/v2/deliverypoints?city_code=44&weight_max=50&allowed_cod=1",
+        "https://api.edu.cdek.ru/v2/deliverypoints"
+      ],
+      "headings": [],
+      "codeBlockCount": 0,
+      "firstParagraph": "GET请求， 请求URL\n 测试环境\n | https://api.edu.cdek.ru/v2/deliverypoints\n |\n 正式环境\n | https://api .cdek.ru/v2/deliverypoints\n |"
+    },
+    {
+      "id": 206637839,
+      "slug": "tracing",
+      "title": "查看轨迹",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/tracing",
+      "wordCount": 1909,
+      "updatedAt": "2025-08-01T02:32:29.000Z",
+      "publishedAt": "2025-08-01T02:32:29.000Z",
+      "textLength": 10139,
+      "endpoints": [],
+      "headings": [],
+      "codeBlockCount": 5,
+      "firstParagraph": "第一步：验证\n POST请求， 请求URL\n 正式环境\n | https://auth.api.cdek.ru/web/simpleauth/authorize\n |"
+    },
+    {
+      "id": 230516929,
+      "slug": "statuses",
+      "title": "轨迹列表",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/statuses",
+      "wordCount": 537,
+      "updatedAt": "2025-08-01T05:33:40.000Z",
+      "publishedAt": "2025-08-01T05:33:40.000Z",
+      "textLength": 1204,
+      "endpoints": [],
+      "headings": [],
+      "codeBlockCount": 0,
+      "firstParagraph": "​ 轨迹代码\n | 轨迹俄文名称\n | 轨迹中文名称\n |\n CREATED\n | Создан\n | 已创建\n |\n ACCEPTED_FOR_DELIVERY\n | Принят на доставку\n | 接受来交付\n |\n ACCEPTED_AT_SORTING_CENTER\n | Прибыл в сортировочный центр\n | 达到分拣中心\n |\n ACCEPTED_AT_COURIER_POINT\n | Прибыл в пункт доставки\n | 达到交付点\n |\n SENT_TO_RECEIVER_COUNTRY\n | Отправлен в страну назначения\n | 送到目的国\n |\n SENT_TO_NEXT_CITY\n | Отправлен в "
+    },
+    {
+      "id": 178934780,
+      "slug": "tariff_codes",
+      "title": "服务列表",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/tariff_codes",
+      "wordCount": 649,
+      "updatedAt": "2026-01-19T02:07:52.000Z",
+      "publishedAt": "2026-01-19T02:07:52.000Z",
+      "textLength": 1286,
+      "endpoints": [],
+      "headings": [],
+      "codeBlockCount": 0,
+      "firstParagraph": "服务代码\n | 服务俄文名称\n | 服务中文名称\n | 服务模式\n | 重量限制\n | 服务类型\n |\n 62\n | Магистральный экспресс\n | 干线\n | Склад-склад 库到库\n | 无\n | 派送\n |\n 121\n | Дверь-дверь 门到门\n |\n 122\n | Склад-дверь 库到门\n |\n 123\n | Дверь-склад 门到库\n |\n 136\n | Посылка Parcel\n | 快件\n | Склад-склад 库到库\n | 50公斤以下\n | 电商\n |\n 137\n | Склад-дверь 库到门\n |\n 138\n | Дверь-склад 门到库\n |\n 139\n | Дверь-дверь 门到门\n |\n 184\n | E-"
+    },
+    {
+      "id": 201807913,
+      "slug": "currency",
+      "title": "货币列表",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/currency",
+      "wordCount": 200,
+      "updatedAt": "2025-08-01T03:27:38.000Z",
+      "publishedAt": "2025-08-01T03:27:38.000Z",
+      "textLength": 602,
+      "endpoints": [],
+      "headings": [],
+      "codeBlockCount": 0,
+      "firstParagraph": "货币编号\n | 货币名称\n | 货币代码\n |\n 1\n | 🇷🇺 俄罗斯卢布\n | RUB\n |\n 2\n | 🇰🇿 哈萨克斯坦坚戈\n | KZT\n |\n 3\n | 🇺🇸 美元\n | USD\n |\n 4\n | 🇪🇺 欧元\n | EUR\n |\n 5\n | 🇬🇧 英镑\n | GBP\n |\n 6\n | 🇨🇳 中国人民币\n | CNY\n |\n 7\n | 🇧🇾 白俄罗斯卢布\n | BYR\n |\n 8\n | 🇺🇦 乌克兰格里夫纳\n | UAH\n |\n 9\n | 🇰🇬 吉尔吉斯斯坦索姆\n | KGS\n |\n 10\n | 🇦🇲 亚美尼亚德拉姆\n | AMD\n |\n 11\n | 🇹🇷 土耳其里拉\n | TRY\n |\n 12\n | 🇹🇭 泰铢\n | THB\n |\n 13\n | 🇰🇷"
+    },
+    {
+      "id": 201822209,
+      "slug": "delivery_modes",
+      "title": "运输模式列表",
+      "sourceUrl": "https://www.yuque.com/cdek/api2/delivery_modes",
+      "wordCount": 58,
+      "updatedAt": "2025-08-01T03:27:48.000Z",
+      "publishedAt": "2025-08-01T03:27:48.000Z",
+      "textLength": 147,
+      "endpoints": [],
+      "headings": [],
+      "codeBlockCount": 0,
+      "firstParagraph": "运输模式代码\n | 运输模式\n |\n 1\n | 门到门\n |\n 2\n | 门到库\n |\n 3\n | 库到门\n |\n 4\n | 库到库\n |\n 6\n | 门到快递柜\n |\n 7\n | 库到快递柜\n |\n 8\n | 快递柜到门\n |\n 9\n | 快递柜到库\n |\n 10\n | 快递柜到快递柜\n |"
+    }
+  ]
+}

@@ -1,0 +1,466 @@
+{
+  "meta": {
+    "source": "https://api.edu.cdek.ru/v2/location/cities?country_codes=RU&region_code={region_code}&lang=rus&size=10000",
+    "environment": "CDEK test/edu",
+    "fetched_at": "2026-06-15T06:18:24.142Z",
+    "lang": "rus",
+    "regions_count": 87,
+    "raw_rows": 135409,
+    "unique_rows": 135409,
+    "max_region_count": 6979,
+    "regions_over_9999": [],
+    "fields": [
+      "code",
+      "city_uuid",
+      "city",
+      "fias_guid",
+      "country_code",
+      "country",
+      "region",
+      "region_code",
+      "fias_region_guid",
+      "sub_region",
+      "longitude",
+      "latitude",
+      "time_zone",
+      "payment_limit"
+    ]
+  },
+  "perRegion": [
+    {
+      "region_code": 16,
+      "region": "Белгородская область",
+      "count": 1523
+    },
+    {
+      "region_code": 78,
+      "region": "Кабардино-Балкария",
+      "count": 177
+    },
+    {
+      "region_code": 15,
+      "region": "Омская область",
+      "count": 1457
+    },
+    {
+      "region_code": 69,
+      "region": "Пензенская область",
+      "count": 1398
+    },
+    {
+      "region_code": 26,
+      "region": "Ленинградская область",
+      "count": 2779
+    },
+    {
+      "region_code": 12,
+      "region": "Республика Бурятия",
+      "count": 639
+    },
+    {
+      "region_code": 63,
+      "region": "Воронежская область",
+      "count": 1657
+    },
+    {
+      "region_code": 70,
+      "region": "Ульяновская область",
+      "count": 922
+    },
+    {
+      "region_code": 90,
+      "region": "Республика Крым",
+      "count": 760
+    },
+    {
+      "region_code": 27,
+      "region": "Башкортостан",
+      "count": 4496
+    },
+    {
+      "region_code": 68,
+      "region": "Мордовия",
+      "count": 1242
+    },
+    {
+      "region_code": 48,
+      "region": "Удмуртия",
+      "count": 1871
+    },
+    {
+      "region_code": 82,
+      "region": "Санкт-Петербург",
+      "count": 41
+    },
+    {
+      "region_code": 1,
+      "region": "Республика Коми",
+      "count": 729
+    },
+    {
+      "region_code": 11,
+      "region": "Ханты-Мансийский автономный округ - Югра",
+      "count": 236
+    },
+    {
+      "region_code": 44,
+      "region": "Кировская область",
+      "count": 3915
+    },
+    {
+      "region_code": 46,
+      "region": "Калмыкия",
+      "count": 262
+    },
+    {
+      "region_code": 77,
+      "region": "Ненецкий автономный округ",
+      "count": 47
+    },
+    {
+      "region_code": 28,
+      "region": "Курганская область",
+      "count": 1215
+    },
+    {
+      "region_code": 79,
+      "region": "Республика Северная Осетия - Алания",
+      "count": 218
+    },
+    {
+      "region_code": 33,
+      "region": "Калужская область",
+      "count": 2939
+    },
+    {
+      "region_code": 23,
+      "region": "Новосибирская область",
+      "count": 1503
+    },
+    {
+      "region_code": 43,
+      "region": "Мурманская область",
+      "count": 73
+    },
+    {
+      "region_code": 55,
+      "region": "Камчатский край",
+      "count": 89
+    },
+    {
+      "region_code": 31,
+      "region": "Новгородская область",
+      "count": 3377
+    },
+    {
+      "region_code": 2,
+      "region": "Алтайский край",
+      "count": 1600
+    },
+    {
+      "region_code": 1013,
+      "region": "Байконур",
+      "count": 0
+    },
+    {
+      "region_code": 1021,
+      "region": "Фиктивный",
+      "count": 4
+    },
+    {
+      "region_code": 19,
+      "region": "Ставропольский край",
+      "count": 766
+    },
+    {
+      "region_code": 41,
+      "region": "Рязанская область",
+      "count": 2432
+    },
+    {
+      "region_code": 45,
+      "region": "Ростовская область",
+      "count": 2202
+    },
+    {
+      "region_code": 57,
+      "region": "Самарская область",
+      "count": 1285
+    },
+    {
+      "region_code": 73,
+      "region": "Республика Карелия",
+      "count": 835
+    },
+    {
+      "region_code": 39,
+      "region": "Татарстан",
+      "count": 3069
+    },
+    {
+      "region_code": 20,
+      "region": "Сахалинская область",
+      "count": 228
+    },
+    {
+      "region_code": 64,
+      "region": "Чувашия",
+      "count": 1664
+    },
+    {
+      "region_code": 25,
+      "region": "Республика Алтай",
+      "count": 319
+    },
+    {
+      "region_code": 21,
+      "region": "Дагестан",
+      "count": 1692
+    },
+    {
+      "region_code": 3,
+      "region": "Челябинская область",
+      "count": 1308
+    },
+    {
+      "region_code": 34,
+      "region": "Астраханская область",
+      "count": 437
+    },
+    {
+      "region_code": 67,
+      "region": "Нижегородская область",
+      "count": 4526
+    },
+    {
+      "region_code": 37,
+      "region": "Тульская область",
+      "count": 3007
+    },
+    {
+      "region_code": 40,
+      "region": "Волгоградская область",
+      "count": 1444
+    },
+    {
+      "region_code": 58,
+      "region": "Тамбовская область",
+      "count": 1402
+    },
+    {
+      "region_code": 56,
+      "region": "Амурская область",
+      "count": 655
+    },
+    {
+      "region_code": 80,
+      "region": "Карачаево-Черкесия",
+      "count": 153
+    },
+    {
+      "region_code": 59,
+      "region": "Магаданская область",
+      "count": 61
+    },
+    {
+      "region_code": 38,
+      "region": "Калининградская область",
+      "count": 1065
+    },
+    {
+      "region_code": 76,
+      "region": "Еврейская автономная область",
+      "count": 96
+    },
+    {
+      "region_code": 30,
+      "region": "Псковская область",
+      "count": 6979
+    },
+    {
+      "region_code": 5,
+      "region": "Оренбургская область",
+      "count": 1638
+    },
+    {
+      "region_code": 975,
+      "region": "Севастополь",
+      "count": 3
+    },
+    {
+      "region_code": 60,
+      "region": "Липецкая область",
+      "count": 1563
+    },
+    {
+      "region_code": 24,
+      "region": "Свердловская область",
+      "count": 1818
+    },
+    {
+      "region_code": 35,
+      "region": "Ярославская область",
+      "count": 4795
+    },
+    {
+      "region_code": 62,
+      "region": "Курская область",
+      "count": 2531
+    },
+    {
+      "region_code": 14,
+      "region": "Хабаровский край",
+      "count": 525
+    },
+    {
+      "region_code": 66,
+      "region": "Архангельская область",
+      "count": 3567
+    },
+    {
+      "region_code": 52,
+      "region": "Тюменская область",
+      "count": 1238
+    },
+    {
+      "region_code": 49,
+      "region": "Забайкальский край",
+      "count": 872
+    },
+    {
+      "region_code": 8,
+      "region": "Ивановская область",
+      "count": 2318
+    },
+    {
+      "region_code": 22,
+      "region": "Пермский край",
+      "count": 3369
+    },
+    {
+      "region_code": 74,
+      "region": "Республика Хакасия",
+      "count": 284
+    },
+    {
+      "region_code": 65,
+      "region": "Смоленская область",
+      "count": 3992
+    },
+    {
+      "region_code": 36,
+      "region": "Орловская область",
+      "count": 2490
+    },
+    {
+      "region_code": 4,
+      "region": "Иркутская область",
+      "count": 1509
+    },
+    {
+      "region_code": 54,
+      "region": "Кемеровская область",
+      "count": 954
+    },
+    {
+      "region_code": 7,
+      "region": "Краснодарский край",
+      "count": 1783
+    },
+    {
+      "region_code": 42,
+      "region": "Костромская область",
+      "count": 2854
+    },
+    {
+      "region_code": 71,
+      "region": "Чеченская Республика",
+      "count": 361
+    },
+    {
+      "region_code": 53,
+      "region": "Томская область",
+      "count": 546
+    },
+    {
+      "region_code": 13,
+      "region": "Красноярский край",
+      "count": 1712
+    },
+    {
+      "region_code": 61,
+      "region": "Адыгея",
+      "count": 244
+    },
+    {
+      "region_code": 32,
+      "region": "Марий Эл",
+      "count": 1479
+    },
+    {
+      "region_code": 6,
+      "region": "Ямало-Ненецкий автономный округ",
+      "count": 105
+    },
+    {
+      "region_code": 47,
+      "region": "Саратовская область",
+      "count": 1629
+    },
+    {
+      "region_code": 50,
+      "region": "Тверская область",
+      "count": 955
+    },
+    {
+      "region_code": 10,
+      "region": "Республика Саха (Якутия)",
+      "count": 631
+    },
+    {
+      "region_code": 75,
+      "region": "Республика Тыва",
+      "count": 155
+    },
+    {
+      "region_code": 9,
+      "region": "Московская область",
+      "count": 6185
+    },
+    {
+      "region_code": 72,
+      "region": "Ингушетия",
+      "count": 57
+    },
+    {
+      "region_code": 51,
+      "region": "Вологодская область",
+      "count": 6708
+    },
+    {
+      "region_code": 29,
+      "region": "Брянская область",
+      "count": 2367
+    },
+    {
+      "region_code": 83,
+      "region": "Чукотский автономный округ",
+      "count": 57
+    },
+    {
+      "region_code": 17,
+      "region": "Владимирская область",
+      "count": 2392
+    },
+    {
+      "region_code": 18,
+      "region": "Приморский край",
+      "count": 641
+    },
+    {
+      "region_code": 81,
+      "region": "Москва",
+      "count": 288
+    }
+  ]
+}

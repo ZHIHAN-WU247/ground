@@ -1,0 +1,41 @@
+node_modules/
+.next/
+.next-*/
+dist/
+build/
+out/
+coverage/
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+apps/web/.vercel/
+tmp/
+.cache/
+.turbo/
+
+# Runtime-generated application data
+apps/api/data/*.json
+
+# Local certificates and credentials
+.certs/
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Logs and local process output
+logs/
+*.log
+
+# Editor and operating-system files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Generated CDEK reference datasets (regenerate with the adjacent script)
+cdek-api2-crawl/russia-cities-rus.csv
+cdek-api2-crawl/russia-cities-rus.json
