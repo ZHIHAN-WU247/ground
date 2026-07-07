@@ -106,7 +106,6 @@ export function LoginForm() {
           <input id="password" type="password" value={password} onChange={(event) => setPassword(event.target.value)} required />
         </div>
       </div>
-      <p className="muted">{t("auth.login.adminHint")}</p>
       <div className="button-row">
         <button className="button primary" type="submit" disabled={isSubmitting}>
           {isSubmitting ? copy.submit : copy.submit}

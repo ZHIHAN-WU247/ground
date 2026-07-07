@@ -964,6 +964,177 @@ body:has(.logistics-home) {
   background: #d92c3b;
 }
 
+.auth-page {
+  --brand: #ef3b49;
+  --brand-dark: #d92c3b;
+  --border: #e1e4ea;
+  position: relative;
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 10%, rgba(239, 59, 73, 0.08), transparent 23rem),
+    radial-gradient(circle at 10% 78%, rgba(109, 92, 231, 0.06), transparent 25rem),
+    #f7f8fb;
+  font-family: "Avenir Next", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif;
+}
+
+.auth-page::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(113, 121, 136, 0.13) 0.7px, transparent 0.8px);
+  background-size: 28px 28px;
+  content: "";
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.auth-page-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: calc(100vh - 77px);
+  align-items: center;
+  padding-top: 72px;
+  padding-bottom: 112px;
+}
+
+.auth-page .panel {
+  width: min(920px, 100%);
+  justify-self: center;
+  padding: clamp(30px, 5vw, 52px);
+  border-color: #e1e4ea;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 64px rgba(32, 37, 48, 0.1);
+}
+
+.auth-page input:focus {
+  outline-color: rgba(239, 59, 73, 0.16);
+}
+
+.auth-page .button-row {
+  justify-content: center;
+  margin-top: 28px;
+}
+
+.auth-page .button.primary {
+  min-width: 180px;
+  border-color: #ef3b49;
+  background: #ef3b49;
+}
+
+.auth-page .button.primary:hover,
+.auth-page .button.primary:focus-visible {
+  background: #d92c3b;
+}
+
+.register-page .field-action-row .button {
+  border-color: rgba(239, 59, 73, 0.32);
+  background: #ffffff;
+  color: #d92c3b;
+  font-weight: 700;
+}
+
+.register-page .field-action-row .button:hover,
+.register-page .field-action-row .button:focus-visible {
+  border-color: #ef3b49;
+  background: rgba(239, 59, 73, 0.07);
+  outline: none;
+}
+
+.admin-home-page {
+  --brand: #ef3b49;
+  --brand-dark: #d92c3b;
+  --border: #e1e4ea;
+  position: relative;
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 10%, rgba(239, 59, 73, 0.08), transparent 23rem),
+    radial-gradient(circle at 10% 78%, rgba(109, 92, 231, 0.06), transparent 25rem),
+    #f7f8fb;
+  font-family: "Avenir Next", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif;
+}
+
+.admin-home-page::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(113, 121, 136, 0.13) 0.7px, transparent 0.8px);
+  background-size: 28px 28px;
+  content: "";
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.admin-home-page-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: calc(100vh - 77px);
+  align-items: center;
+  padding-top: 72px;
+  padding-bottom: 112px;
+}
+
+.admin-home-grid {
+  width: 100%;
+}
+
+.admin-home-card {
+  position: relative;
+  display: grid;
+  min-height: 240px;
+  place-content: center;
+  gap: 18px;
+  overflow: hidden;
+  border-color: #e1e4ea;
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 20px 54px rgba(32, 37, 48, 0.09);
+  text-align: center;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
+}
+
+.admin-home-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: #ef3b49;
+  content: "";
+}
+
+.admin-home-card:nth-child(2)::before {
+  background: #111111;
+}
+
+.admin-home-card:nth-child(3)::before {
+  background: #6d5ce7;
+}
+
+.admin-home-card h3 {
+  font-size: clamp(1.65rem, 2.5vw, 2.15rem);
+}
+
+.admin-home-card p {
+  max-width: 300px;
+  margin: 0;
+  color: #707888;
+  font-size: 1.05rem;
+}
+
+.admin-home-card:hover,
+.admin-home-card:focus-visible {
+  border-color: rgba(239, 59, 73, 0.38);
+  outline: none;
+  box-shadow: 0 28px 68px rgba(32, 37, 48, 0.13);
+  transform: translateY(-3px);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

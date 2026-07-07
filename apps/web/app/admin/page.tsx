@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { PageHero } from "../../components/PageHero";
 import { T } from "../../components/I18nProvider";
 
 const modules = [
@@ -10,18 +9,17 @@ const modules = [
 
 export default function AdminPage() {
   return (
-    <>
-      <PageHero eyebrowKey="admin.home.eyebrow" titleKey="admin.home.title" descriptionKey="admin.home.description" />
-      <section className="shell section">
-        <div className="grid three">
+    <div className="admin-home-page">
+      <section className="shell section admin-home-page-content">
+        <div className="grid three admin-home-grid">
           {modules.map((item) => (
-            <Link className="card" href={item.href} key={item.href}>
+            <Link className="card admin-home-card" href={item.href} key={item.href}>
               <h3><T id={item.titleKey} /></h3>
               <p><T id={item.bodyKey} /></p>
             </Link>
           ))}
         </div>
       </section>
-    </>
+    </div>
   );
 }
