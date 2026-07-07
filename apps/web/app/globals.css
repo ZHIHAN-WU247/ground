@@ -1135,6 +1135,84 @@ body:has(.logistics-home) {
   transform: translateY(-3px);
 }
 
+.admin-access-page {
+  --brand: #ef3b49;
+  --brand-dark: #d92c3b;
+  --border: #e1e4ea;
+  position: relative;
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 10%, rgba(239, 59, 73, 0.08), transparent 23rem),
+    radial-gradient(circle at 10% 78%, rgba(109, 92, 231, 0.06), transparent 25rem),
+    #f7f8fb;
+  font-family: "Avenir Next", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif;
+}
+
+.admin-access-page::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(113, 121, 136, 0.13) 0.7px, transparent 0.8px);
+  background-size: 28px 28px;
+  content: "";
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.admin-access-content {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: calc(100vh - 77px);
+  place-items: start center;
+  padding-top: clamp(56px, 12vh, 118px);
+  padding-bottom: 96px;
+}
+
+.admin-access-card {
+  position: relative;
+  display: grid;
+  width: min(720px, 100%);
+  min-height: 188px;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #e1e4ea;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 64px rgba(32, 37, 48, 0.1);
+}
+
+.admin-access-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #ef3b49, #6d5ce7);
+  content: "";
+}
+
+.admin-access-card .button-row {
+  margin: 0;
+}
+
+.admin-access-login {
+  min-width: 188px;
+  border-color: #ef3b49;
+  background: #ef3b49;
+  color: #ffffff;
+  box-shadow: 0 14px 34px rgba(239, 59, 73, 0.18);
+}
+
+.admin-access-login:hover,
+.admin-access-login:focus-visible {
+  border-color: #d92c3b;
+  background: #d92c3b;
+  outline: none;
+  box-shadow: 0 18px 42px rgba(239, 59, 73, 0.25);
+  transform: translateY(-2px);
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
