@@ -1,5 +1,11 @@
-import { PageHero } from "../../../../components/PageHero";
+import { AdminBannersClient } from "./AdminBannersClient";
 
 export default function AdminBannersPage() {
-  return <PageHero eyebrowKey="admin.content.banners.eyebrow" titleKey="admin.content.banners.title" descriptionKey="admin.content.banners.description" />;
+  return (
+    <main className="admin-banners-page">
+      <section className="shell section">
+        <AdminBannersClient />
+      </section>
+    </main>
+  );
 }

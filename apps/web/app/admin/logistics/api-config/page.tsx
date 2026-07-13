@@ -1,5 +1,11 @@
-import { PageHero } from "../../../../components/PageHero";
+import { AdminApiConfigClient } from "./AdminApiConfigClient";
 
 export default function AdminApiConfigPage() {
-  return <PageHero eyebrowKey="admin.logistics.api.eyebrow" titleKey="admin.logistics.api.title" descriptionKey="admin.logistics.api.description" />;
+  return (
+    <main className="admin-api-config-page">
+      <section className="shell">
+        <AdminApiConfigClient />
+      </section>
+    </main>
+  );
 }

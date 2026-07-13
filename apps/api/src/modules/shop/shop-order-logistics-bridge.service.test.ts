@@ -74,8 +74,9 @@ const run = async () => {
 
   try {
     const shopService = new (ShopService as unknown as new (path: string) => ShopService)(storePath);
-    const product = shopService.createProduct(productInput);
-    const order = shopService.createOrder({
+    const product = await shopService.createProduct(productInput);
+    const order = await shopService.createOrder({
+      ownerEmail: "ivan@example.com",
       items: [{ productId: product.id, skuId: product.skus[0]!.id, quantity: 2 }],
       recipient: {
         name: "Ivan Petrov",
@@ -108,12 +109,13 @@ const run = async () => {
       () => bridge.submit(order.id, { ...input, taxIdOrDocumentNo: "" }),
       /tax or document/i
     );
-    assert.equal(shopService.getAdminOrder(order.id).status, "CONFIRMED");
+    assert.equal((await shopService.getAdminOrder(order.id)).status, "CONFIRMED");
     assert.equal(fakeLogistics.orders.length, 0);
 
     const result = await bridge.submit(order.id, input);
     const createdInput = fakeLogistics.createdInputs[0] as Parameters<LogisticsService["createOrder"]>[0];
     assert.equal(createdInput.cargoType, "B2C");
+    assert.equal(createdInput.ownerEmail, "ivan@example.com");
     assert.deepEqual(createdInput.recipient, order.recipient);
     assert.deepEqual(createdInput.cargoItems, [{
       name: `${product.name} / ${product.skus[0]!.model} / ${product.skus[0]!.size}`,
@@ -126,7 +128,7 @@ const run = async () => {
     await assert.rejects(() => bridge.submit(order.id, input), /already linked/i);
     assert.equal(fakeLogistics.orders.length, 1);
 
-    const failedOrder = shopService.createOrder({
+    const failedOrder = await shopService.createOrder({
       items: [{ productId: product.id, skuId: product.skus[0]!.id, quantity: 1 }],
       recipient: {
         ...order.recipient,
@@ -136,7 +138,7 @@ const run = async () => {
     shopService.updateOrderStatus(failedOrder.id, "CONFIRMED");
     fakeLogistics.shouldFail = true;
     await assert.rejects(() => bridge.submit(failedOrder.id, input), /creation failed/i);
-    assert.equal(shopService.getAdminOrder(failedOrder.id).status, "CONFIRMED");
+    assert.equal((await shopService.getAdminOrder(failedOrder.id)).status, "CONFIRMED");
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }

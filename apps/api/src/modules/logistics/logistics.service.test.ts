@@ -8,13 +8,13 @@ import { CdekCarrierProvider } from "../carrier/cdek-carrier.provider";
 import { LogisticsService } from "./logistics.service";
 
 class StubCdekCarrierProvider extends CdekCarrierProvider {
-  override async calculateQuote() {
+  override async calculateQuote(input: Parameters<CdekCarrierProvider["calculateQuote"]>[0]) {
     return {
       id: "quote-cdek-1",
       cargoType: "B2C" as const,
       destinationCountry: "Russia" as const,
       destinationCity: "Moscow",
-      deliveryMethod: "TO_DOOR" as const,
+      deliveryMethod: input.deliveryMethod ?? "TO_DOOR" as const,
       actualWeightKg: 6.5,
       volumetricWeightKg: 7.06,
       chargeableWeightKg: 14.11,
@@ -71,7 +71,7 @@ const run = async () => {
   assert.equal(approved.cdekTariffCode, 136);
   assert.equal(approved.carrierLastError, "Selected CDEK tariff is unavailable for the current route and shipment conditions.");
 
-  assert.throws(() => service.markInbound("log-1002"), {
+  await assert.rejects(() => service.markInbound("log-1002"), {
     message: "Only reviewed orders with a tracking number can be marked inbound."
   });
 
@@ -95,6 +95,7 @@ const run = async () => {
   assert.equal(quote.currency, "RUB");
 
   const createOrderInput = {
+    ownerEmail: "Customer@Example.com",
     cargoType: "B2C" as const,
     sender: {
       name: "Ground Customer",
@@ -121,6 +122,7 @@ const run = async () => {
       { name: "Wool socks", unitValueCny: 12.5, quantity: 3 }
     ],
     routeId: "air-cdek" as const,
+    deliveryMethod: "TO_WAREHOUSE" as const,
     goodsName: "Garment samples",
     declaredValue: 120,
     declaredCurrency: "USD" as const,
@@ -146,9 +148,10 @@ const run = async () => {
   assert.equal(created.declaredCurrency, "CNY");
   assert.equal(created.routeId, "air-cdek");
   assert.match(created.orderNo, /^AC\d+$/);
+  assert.equal(created.ownerEmail, "customer@example.com");
 
   assert.deepEqual(created.estimatedQuote, {
-    deliveryMethod: "TO_DOOR",
+    deliveryMethod: "TO_WAREHOUSE",
     actualWeightKg: 6.5,
     volumetricWeightKg: 7.06,
     chargeableWeightKg: 14.11,
@@ -161,6 +164,17 @@ const run = async () => {
     cdekDeliveryMinDays: 1,
     cdekDeliveryMaxDays: 2
   });
+  const otherOrder = await service.createOrder({
+    ...createOrderInput,
+    ownerEmail: "other@example.com"
+  });
+  assert.deepEqual(
+    (await service.listOrders("customer@example.com")).map((order) => order.id),
+    [created.id]
+  );
+  assert.equal((await service.listOrders()).length, 0);
+  assert.equal((await service.listAdminOrders()).some((order) => order.id === created.id), true);
+  assert.equal((await service.listAdminOrders()).some((order) => order.id === otherOrder.id), true);
 
   const routePrefixes = [
     ["air-ems", "AE"],
@@ -201,14 +215,14 @@ const run = async () => {
       new StubCdekCarrierProvider(),
       storePath
     );
-    assert.equal(reloadedService.getOrder(persistedOrder.id).orderNo, persistedOrder.orderNo);
-    reloadedService.discardOrder(persistedOrder.id);
+    assert.equal((await reloadedService.getOrder(persistedOrder.id)).orderNo, persistedOrder.orderNo);
+    await reloadedService.discardOrder(persistedOrder.id);
     const afterDiscardReload = new LogisticsService(
       new FixedCarrierProvider(),
       new StubCdekCarrierProvider(),
       storePath
     );
-    assert.throws(() => afterDiscardReload.getOrder(persistedOrder.id), /not found/i);
+    await assert.rejects(() => afterDiscardReload.getOrder(persistedOrder.id), /not found/i);
   } finally {
     rmSync(directory, { force: true, recursive: true });
     rmSync(isolatedDirectory, { force: true, recursive: true });

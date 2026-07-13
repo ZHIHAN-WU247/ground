@@ -45,6 +45,7 @@ export const logisticsQuoteRequestSchema = z.object({
 export const logisticsOrderCreateSchema = z.object({
   cargoType: cargoTypeSchema,
   routeId: logisticsRouteIdSchema.optional(),
+  deliveryMethod: logisticsDeliveryMethodSchema.default("TO_DOOR"),
   sender: addressContactSchema,
   recipient: addressContactSchema,
   cargoItems: z.array(cargoItemSchema).min(1).optional(),

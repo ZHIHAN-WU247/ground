@@ -4,7 +4,11 @@ import { dirname, join, resolve } from "node:path";
 import { BadRequestException, ConflictException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
 import type { CreateProductInput, Product, ShopOrder, ShopOrderStatus } from "@ground/shared";
 import { sampleProducts } from "@ground/shared";
+import { SupabaseService } from "../database/supabase.service";
+import { SupabaseCustomerRiskGuard, type SupabaseCustomerRiskClient } from "../customer-risk/supabase-customer-risk-guard";
 import type { CreateShopOrderDto } from "./dto/create-shop-order.dto";
+import { SupabaseProductStore, type SupabaseProductClient } from "./supabase-product-store";
+import { SupabaseShopOrderStore, type SupabaseShopOrderClient } from "./supabase-shop-order-store";
 
 export const PRODUCT_STORE_PATH = "PRODUCT_STORE_PATH";
 
@@ -13,22 +17,46 @@ export class ShopService {
   private readonly products: Product[];
   private readonly orders: ShopOrder[];
   private readonly orderStorePath: string;
+  private readonly productStore?: SupabaseProductStore;
+  private readonly shopOrderStore?: SupabaseShopOrderStore;
+  private readonly customerRiskGuard?: SupabaseCustomerRiskGuard;
 
-  constructor(@Optional() @Inject(PRODUCT_STORE_PATH) private readonly storePath = resolve(process.cwd(), "data/products.json")) {
+  constructor(
+    @Optional() @Inject(PRODUCT_STORE_PATH) private readonly storePath = resolve(process.cwd(), "data/products.json"),
+    @Optional() private readonly supabaseService?: SupabaseService
+  ) {
     this.orderStorePath = join(dirname(this.storePath), "shop-orders.json");
     this.products = this.readProducts();
     this.orders = this.readOrders();
+
+    if (this.supabaseService?.client) {
+      this.productStore = new SupabaseProductStore(this.supabaseService.client as unknown as SupabaseProductClient);
+      this.shopOrderStore = new SupabaseShopOrderStore(this.supabaseService.client as unknown as SupabaseShopOrderClient);
+      this.customerRiskGuard = new SupabaseCustomerRiskGuard(this.supabaseService.client as unknown as SupabaseCustomerRiskClient);
+    }
   }
 
-  listProducts(): Product[] {
+  async listProducts(): Promise<Product[]> {
+    if (this.productStore) {
+      return this.productStore.listPublishedProducts();
+    }
+
     return this.products.filter((product) => product.isPublished);
   }
 
-  listAdminProducts(): Product[] {
+  async listAdminProducts(): Promise<Product[]> {
+    if (this.productStore) {
+      return this.productStore.listAdminProducts();
+    }
+
     return this.products;
   }
 
-  getAdminProduct(identifier: string): Product {
+  async getAdminProduct(identifier: string): Promise<Product> {
+    if (this.productStore) {
+      return this.getSupabaseProduct(identifier);
+    }
+
     const product = this.products.find((item) => item.id === identifier || item.slug === identifier);
 
     if (!product) {
@@ -38,8 +66,12 @@ export class ShopService {
     return product;
   }
 
-  getProduct(slug: string): Product {
-    const product = this.listProducts().find((item) => item.slug === slug || item.id === slug);
+  async getProduct(slug: string): Promise<Product> {
+    if (this.productStore) {
+      return this.getSupabaseProduct(slug, { publishedOnly: true });
+    }
+
+    const product = this.products.filter((item) => item.isPublished).find((item) => item.slug === slug || item.id === slug);
 
     if (!product) {
       throw new NotFoundException("Product was not found.");
@@ -48,9 +80,13 @@ export class ShopService {
     return product;
   }
 
-  createProduct(input: CreateProductInput): Product {
-    if (this.products.some((product) => product.slug.toLowerCase() === input.slug.toLowerCase())) {
+  async createProduct(input: CreateProductInput): Promise<Product> {
+    if (await this.hasProductSlug(input.slug)) {
       throw new ConflictException("Product slug already exists.");
+    }
+
+    if (this.productStore) {
+      return this.productStore.createProduct(input);
     }
 
     const product: Product = {
@@ -67,7 +103,18 @@ export class ShopService {
     return product;
   }
 
-  updateProduct(identifier: string, input: CreateProductInput): Product {
+  async updateProduct(identifier: string, input: CreateProductInput): Promise<Product> {
+    if (this.productStore) {
+      const current = await this.getSupabaseProduct(identifier);
+      const duplicateId = await this.productStore.findProductBySlug(input.slug);
+
+      if (duplicateId && duplicateId !== current.id) {
+        throw new ConflictException("Product slug already exists.");
+      }
+
+      return this.productStore.updateProduct(current.id, input);
+    }
+
     const index = this.findProductIndex(identifier);
     const current = this.products[index]!;
 
@@ -90,7 +137,11 @@ export class ShopService {
     return updated;
   }
 
-  setProductPublished(identifier: string, isPublished: boolean): Product {
+  async setProductPublished(identifier: string, isPublished: boolean): Promise<Product> {
+    if (this.productStore) {
+      return this.productStore.setProductPublished(identifier, isPublished);
+    }
+
     const index = this.findProductIndex(identifier);
     const updated: Product = {
       ...this.products[index]!,
@@ -103,7 +154,11 @@ export class ShopService {
     return updated;
   }
 
-  deleteProduct(identifier: string): Product {
+  async deleteProduct(identifier: string): Promise<Product> {
+    if (this.productStore) {
+      return this.productStore.deleteProduct(identifier);
+    }
+
     const index = this.findProductIndex(identifier);
     const deleted = this.products[index]!;
     const products = this.products.filter((_, productIndex) => productIndex !== index);
@@ -112,19 +167,58 @@ export class ShopService {
     return deleted;
   }
 
-  listOrders(): ShopOrder[] {
+  async listOrders(ownerEmail?: string): Promise<ShopOrder[]> {
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.listOrders(ownerEmail);
+    }
+
+    const normalizedOwnerEmail = this.normalizeOwnerEmail(ownerEmail);
+
+    if (!normalizedOwnerEmail) {
+      return [];
+    }
+
+    return this.orders.filter((order) => order.ownerEmail === normalizedOwnerEmail);
+  }
+
+  async listAdminOrders(): Promise<ShopOrder[]> {
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.listAdminOrders();
+    }
+
     return this.orders;
   }
 
-  listAdminOrders(): ShopOrder[] {
-    return this.orders;
+  async getOrder(identifier: string, ownerEmail?: string): Promise<ShopOrder> {
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.getOrder(identifier, ownerEmail);
+    }
+
+    const normalizedOwnerEmail = this.normalizeOwnerEmail(ownerEmail);
+    const order = normalizedOwnerEmail
+      ? this.orders.find((item) => (item.id === identifier || item.orderNo === identifier) && item.ownerEmail === normalizedOwnerEmail)
+      : undefined;
+
+    if (!order) {
+      throw new NotFoundException("Shop order was not found.");
+    }
+
+    return order;
   }
 
-  listLogisticsHandoffs(): ShopOrder[] {
+  async listLogisticsHandoffs(): Promise<ShopOrder[]> {
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.listLogisticsHandoffs();
+    }
+
     return this.orders.filter((order) => order.status === "CONFIRMED");
   }
 
-  getAdminOrder(identifier: string): ShopOrder {
+  async getAdminOrder(identifier: string): Promise<ShopOrder> {
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.getAdminOrder(identifier);
+    }
+
     const order = this.orders.find((item) => item.id === identifier || item.orderNo === identifier);
 
     if (!order) {
@@ -134,9 +228,10 @@ export class ShopService {
     return order;
   }
 
-  createOrder(input: CreateShopOrderDto): ShopOrder {
+  async createOrder(input: CreateShopOrderDto): Promise<ShopOrder> {
+    const products = await this.listProducts();
     const items = input.items.map((item) => {
-      const product = this.products.find((candidate) => candidate.id === item.productId && candidate.isPublished);
+      const product = products.find((candidate) => candidate.id === item.productId);
       const sku = product?.skus.find((candidate) => candidate.id === item.skuId);
 
       if (!product || !sku) {
@@ -164,9 +259,26 @@ export class ShopService {
     }
 
     const totalAmount = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
+    const ownerEmail = this.normalizeOwnerEmail(input.ownerEmail);
+    await this.customerRiskGuard?.assertCanCreateOrder(ownerEmail);
+    const orderNo = await this.generateShopOrderNo();
+
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.createOrder({
+        orderNo,
+        ...(ownerEmail ? { ownerEmail } : {}),
+        status: "PENDING_CONFIRMATION",
+        items,
+        recipient: input.recipient,
+        totalAmount,
+        currency: items[0]!.currency
+      });
+    }
+
     const order: ShopOrder = {
       id: `shop-${randomUUID()}`,
-      orderNo: `SH${new Date().getFullYear()}${String(this.orders.length + 1).padStart(8, "0")}`,
+      orderNo,
+      ...(ownerEmail ? { ownerEmail } : {}),
       status: "PENDING_CONFIRMATION",
       items: items.map(({ currency: _currency, ...item }) => item),
       recipient: input.recipient,
@@ -180,7 +292,31 @@ export class ShopService {
     return order;
   }
 
-  updateOrderStatus(identifier: string, status: Extract<ShopOrderStatus, "CONFIRMED" | "CANCELLED">): ShopOrder {
+  private async hasProductSlug(slug: string) {
+    if (this.productStore) {
+      return Boolean(await this.productStore.findProductBySlug(slug));
+    }
+
+    return this.products.some((product) => product.slug.toLowerCase() === slug.toLowerCase());
+  }
+
+  private async getSupabaseProduct(identifier: string, options: { publishedOnly?: boolean } = {}) {
+    try {
+      return await this.productStore!.getProduct(identifier, options);
+    } catch (error) {
+      if (error instanceof Error && /not found/i.test(error.message)) {
+        throw new NotFoundException("Product was not found.");
+      }
+
+      throw error;
+    }
+  }
+
+  async updateOrderStatus(identifier: string, status: Extract<ShopOrderStatus, "CONFIRMED" | "CANCELLED">): Promise<ShopOrder> {
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.updateOrderStatus(identifier, status);
+    }
+
     const index = this.orders.findIndex((order) => order.id === identifier || order.orderNo === identifier);
 
     if (index === -1) {
@@ -201,7 +337,11 @@ export class ShopService {
     return updated;
   }
 
-  linkOrderToLogistics(identifier: string, logisticsOrder: { id: string; orderNo: string }): ShopOrder {
+  async linkOrderToLogistics(identifier: string, logisticsOrder: { id: string; orderNo: string }): Promise<ShopOrder> {
+    if (this.shopOrderStore) {
+      return this.shopOrderStore.linkOrderToLogistics(identifier, logisticsOrder);
+    }
+
     const index = this.orders.findIndex((order) => order.id === identifier || order.orderNo === identifier);
 
     if (index === -1) {
@@ -231,6 +371,11 @@ export class ShopService {
     return updated;
   }
 
+  private async generateShopOrderNo() {
+    const count = this.shopOrderStore ? (await this.shopOrderStore.listAdminOrders()).length : this.orders.length;
+    return `SH${new Date().getFullYear()}${String(count + 1).padStart(8, "0")}`;
+  }
+
   private readProducts(): Product[] {
     if (!existsSync(this.storePath)) {
       return structuredClone(sampleProducts);
@@ -255,6 +400,10 @@ export class ShopService {
     }
 
     return index;
+  }
+
+  private normalizeOwnerEmail(ownerEmail?: string) {
+    return ownerEmail?.trim().toLowerCase() || undefined;
   }
 
   private persistProducts(products: Product[]) {

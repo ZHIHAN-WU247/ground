@@ -2,7 +2,15 @@ const fixedLocalAdminEmails = ["admin@ground.local", "ops@ground.local", "cdek@g
 
 const normalizeEmail = (value: string) => value.trim().toLowerCase();
 
-export function getLocalAdminEmails(configuredValue = process.env.GROUND_LOCAL_ADMIN_EMAILS) {
+export function getLocalAdminEmails(
+  configuredValue = process.env.GROUND_LOCAL_ADMIN_EMAILS,
+  nodeEnv = process.env.NODE_ENV,
+  enabledValue = process.env.GROUND_ENABLE_LOCAL_ADMIN
+) {
+  if (nodeEnv === "production" && enabledValue !== "true") {
+    return [];
+  }
+
   const configured = configuredValue
     ?.split(",")
     .map((item) => normalizeEmail(item))
@@ -15,6 +23,11 @@ export function getLocalAdminEmails(configuredValue = process.env.GROUND_LOCAL_A
   return [...fixedLocalAdminEmails];
 }
 
-export function isLocalAdminEmail(email: string, configuredValue = process.env.GROUND_LOCAL_ADMIN_EMAILS) {
-  return getLocalAdminEmails(configuredValue).includes(normalizeEmail(email));
+export function isLocalAdminEmail(
+  email: string,
+  configuredValue = process.env.GROUND_LOCAL_ADMIN_EMAILS,
+  nodeEnv = process.env.NODE_ENV,
+  enabledValue = process.env.GROUND_ENABLE_LOCAL_ADMIN
+) {
+  return getLocalAdminEmails(configuredValue, nodeEnv, enabledValue).includes(normalizeEmail(email));
 }

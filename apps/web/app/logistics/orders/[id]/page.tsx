@@ -1,4 +1,3 @@
-import { PageHero } from "../../../../components/PageHero";
 import { LogisticsOrderDetailClient } from "./LogisticsOrderDetailClient";
 
 interface PageProps {
@@ -9,11 +8,10 @@ export default async function LogisticsOrderDetailPage({ params }: PageProps) {
   const { id } = await params;
 
   return (
-    <>
-      <PageHero eyebrowKey="tracking.eyebrow" title={id} descriptionKey="orders.detail.description" />
-      <section className="shell section">
+    <main className="order-detail-page">
+      <section className="shell order-detail-content">
         <LogisticsOrderDetailClient id={id} />
       </section>
-    </>
+    </main>
   );
 }

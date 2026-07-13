@@ -9,6 +9,7 @@ const sampleOrder: LogisticsOrder = {
   id: "log-test",
   orderNo: "LG202699999999",
   cargoType: "B2C",
+  deliveryMethod: "TO_DOOR",
   status: "UNDER_REVIEW",
   reviewState: "PENDING",
   sender: {
@@ -81,7 +82,26 @@ const { cdekTariffCode: _ignoredTariffCode, ...sampleOrderWithoutTariff } = samp
 const payloadWithDefaultTariff = (provider as unknown as {
   buildOrderPayload: (order: LogisticsOrder) => Record<string, unknown>;
 }).buildOrderPayload(sampleOrderWithoutTariff);
-assert.equal(payloadWithDefaultTariff.tariff_code, 139);
+assert.equal(payloadWithDefaultTariff.tariff_code, 137);
+const warehouseOrderPayload = (provider as unknown as {
+  buildOrderPayload: (order: LogisticsOrder, options?: { shipmentPointCode?: string; deliveryPointCode?: string }) => Record<string, unknown>;
+}).buildOrderPayload({
+  ...sampleOrderWithoutTariff,
+  deliveryMethod: "TO_WAREHOUSE"
+}, { shipmentPointCode: "MSK42", deliveryPointCode: "SPB42" });
+assert.equal(warehouseOrderPayload.tariff_code, 136);
+assert.equal(warehouseOrderPayload.shipment_point, "MSK42");
+assert.equal(warehouseOrderPayload.delivery_point, "SPB42");
+assert.equal("from_location" in warehouseOrderPayload, false);
+assert.equal("to_location" in warehouseOrderPayload, false);
+const bEndOrderPayload = (provider as unknown as {
+  buildOrderPayload: (order: LogisticsOrder) => Record<string, unknown>;
+}).buildOrderPayload({
+  ...sampleOrderWithoutTariff,
+  cargoType: "B2B",
+  deliveryMethod: "TO_WAREHOUSE"
+});
+assert.equal(bEndOrderPayload.tariff_code, 139);
 const calculatorPayload = (provider as unknown as {
   buildCalculatorPayload: (input: {
     cargoType: "B2C";
@@ -223,21 +243,34 @@ assert.equal((moscowCalculatorPayload.to_location as Record<string, unknown>).po
 const run = async () => {
   const numericTrackingProvider = new CdekCarrierProvider() as unknown as {
     createOrder: (order: LogisticsOrder) => Promise<{ entityUuid: string; requestUuid: string | undefined; cdekNumber: string | undefined; state: string | undefined; raw: unknown }>;
-    cdekFetch: (path: string, options: { method: "GET" | "POST"; body?: unknown }) => Promise<Record<string, unknown>>;
+    cdekFetch: (path: string, options: { method: "GET" | "POST"; body?: unknown }) => Promise<Record<string, unknown> | Array<Record<string, unknown>>>;
     assertProductionWritesEnabled: () => void;
   };
 
   numericTrackingProvider.assertProductionWritesEnabled = () => undefined;
-  numericTrackingProvider.cdekFetch = async () => ({
-    entity: {
-      uuid: "test-entity-1",
-      cdek_number: 1106626962
-    },
-    requests: [{ uuid: "test-request-1", state: "SUCCESSFUL" }]
-  });
+  const numericTrackingCalls: Array<{ path: string; options: { method: "GET" | "POST"; body?: unknown } }> = [];
+  numericTrackingProvider.cdekFetch = async (path, options) => {
+    numericTrackingCalls.push({ path, options });
+
+    if (path.startsWith("/v2/deliverypoints")) {
+      return [{ code: "SPB42", location: { postal_code: "190000" } }];
+    }
+
+    return {
+      entity: {
+        uuid: "test-entity-1",
+        cdek_number: 1106626962
+      },
+      requests: [{ uuid: "test-request-1", state: "SUCCESSFUL" }]
+    };
+  };
 
   const createOrderResult = await numericTrackingProvider.createOrder(sampleOrder);
   assert.equal(createOrderResult.cdekNumber, "1106626962");
+  const createOrderCall = numericTrackingCalls.find((call) => call.path === "/v2/orders");
+  const createOrderPayload = createOrderCall?.options.body as Record<string, unknown>;
+  assert.equal(createOrderPayload.shipment_point, "SPB42");
+  assert.equal(createOrderPayload.delivery_point, "SPB42");
 
   const quoteProvider = new CdekCarrierProvider() as unknown as {
     calculateQuote: (input: {

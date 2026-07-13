@@ -5,11 +5,14 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useI18n } from "./I18nProvider";
+import { AuthRecoveryRedirect } from "./AuthRecoveryRedirect";
 import {
   clearActiveLocalUserProfile,
   getActiveLocalUserProfile,
   LOCAL_USER_PROFILE_EVENT
 } from "../lib/local-user-profile";
+import { isSupabaseAdminSession, SUPABASE_AUTH_EVENT } from "../lib/supabase-auth";
+import { getAdminNavHref } from "./site-chrome-navigation";
 
 const navItems = [
   { href: "/logistics", labelKey: "nav.logistics" },
@@ -40,6 +43,7 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { locale, t } = useI18n();
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isAdminSignedIn, setIsAdminSignedIn] = useState(false);
 
   useEffect(() => {
     const syncAuthState = () => {
@@ -57,6 +61,21 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     };
   }, []);
 
+  useEffect(() => {
+    const syncAdminState = () => {
+      setIsAdminSignedIn(isSupabaseAdminSession());
+    };
+
+    syncAdminState();
+    window.addEventListener("storage", syncAdminState);
+    window.addEventListener(SUPABASE_AUTH_EVENT, syncAdminState);
+
+    return () => {
+      window.removeEventListener("storage", syncAdminState);
+      window.removeEventListener(SUPABASE_AUTH_EVENT, syncAdminState);
+    };
+  }, []);
+
   const logout = () => {
     clearActiveLocalUserProfile();
     router.push("/");
@@ -68,6 +87,7 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
 
   return (
     <>
+      <AuthRecoveryRedirect />
       <header className="site-header">
         <div className="shell nav">
           <Link className="brand" href="/" aria-label="GROUND home">
@@ -121,7 +141,7 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
             ) : null}
             <Link
               className={isActive("/admin") ? "active" : undefined}
-              href="/admin"
+              href={getAdminNavHref(isAdminSignedIn)}
               aria-current={isActive("/admin") ? "page" : undefined}
             >
               {t("nav.admin")}

@@ -1,4 +1,4 @@
-import { ArrayMinSize, IsArray, IsInt, IsString, Min, ValidateNested } from "class-validator";
+import { ArrayMinSize, IsArray, IsEmail, IsInt, IsOptional, IsString, Min, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
 
 class ShopOrderItemDto {
@@ -40,6 +40,10 @@ class ShopRecipientDto {
 }
 
 export class CreateShopOrderDto {
+  @IsOptional()
+  @IsEmail()
+  ownerEmail?: string;
+
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })

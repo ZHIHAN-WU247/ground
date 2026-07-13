@@ -261,6 +261,7 @@ export const sampleLogisticsOrders: LogisticsOrder[] = [
     id: "log-1002",
     orderNo: "LG202604220002",
     cargoType: "B2C",
+    deliveryMethod: "TO_DOOR",
     status: "UNDER_REVIEW",
     reviewState: "PENDING",
     sender: {
@@ -309,6 +310,7 @@ export const sampleLogisticsOrders: LogisticsOrder[] = [
     id: "log-1001",
     orderNo: "LG202604190001",
     cargoType: "B2C",
+    deliveryMethod: "TO_DOOR",
     status: "CUSTOMS_CLEARANCE",
     reviewState: "APPROVED",
     sender: {

@@ -1,5 +1,11 @@
-import { PageHero } from "../../../../components/PageHero";
+import { AdminPricingClient } from "./AdminPricingClient";
 
 export default function AdminPricingPage() {
-  return <PageHero eyebrowKey="admin.logistics.pricing.eyebrow" titleKey="admin.logistics.pricing.title" descriptionKey="admin.logistics.pricing.description" />;
+  return (
+    <main className="admin-pricing-page">
+      <section className="shell">
+        <AdminPricingClient />
+      </section>
+    </main>
+  );
 }

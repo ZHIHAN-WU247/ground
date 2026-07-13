@@ -7,15 +7,17 @@ import { PageHero } from "../../../components/PageHero";
 import { StatusBadge } from "../../../components/StatusBadge";
 import { useI18n } from "../../../components/I18nProvider";
 import { getJson } from "../../../lib/api";
+import { getActiveLocalUserProfile } from "../../../lib/local-user-profile";
 
 export function LogisticsOrdersClient() {
   const { t } = useI18n();
+  const [ownerEmail, setOwnerEmail] = useState("");
   const [orders, setOrders] = useState<LogisticsOrder[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
   const hasPendingTrackingNumber = orders.some((order) => order.reviewState === "APPROVED" && !order.trackingNo && order.carrierCreateState === "SUBMITTED");
 
-  const loadOrders = async () => {
+  const loadOrders = async (email: string) => {
     setIsLoading(true);
     setError("");
 
@@ -31,7 +33,15 @@ export function LogisticsOrdersClient() {
   };
 
   useEffect(() => {
-    void loadOrders();
+    const email = getActiveLocalUserProfile()?.email?.trim().toLowerCase() ?? "";
+    setOwnerEmail(email);
+
+    if (!email) {
+      setIsLoading(false);
+      return;
+    }
+
+    void loadOrders(email);
   }, []);
 
   useEffect(() => {
@@ -40,11 +50,11 @@ export function LogisticsOrdersClient() {
     }
 
     const timer = window.setInterval(() => {
-      void loadOrders();
+      void loadOrders(ownerEmail);
     }, 5000);
 
     return () => window.clearInterval(timer);
-  }, [hasPendingTrackingNumber]);
+  }, [hasPendingTrackingNumber, ownerEmail]);
 
   const formatQuoteAmount = (order: LogisticsOrder) => {
     if (!order.estimatedQuote) {
@@ -58,13 +68,23 @@ export function LogisticsOrdersClient() {
     <>
       <PageHero eyebrowKey="orders.eyebrow" titleKey="orders.title" descriptionKey="orders.description" actions={[{ href: "/logistics/orders/new", labelKey: "orders.create", primary: true }]} />
       <section className="shell section">
-        {isLoading ? (
+        {!ownerEmail ? (
+          <div className="panel">
+            <div className="empty-state">
+              <h2>{t("account.orders.loginTitle")}</h2>
+              <p>{t("account.orders.loginBody")}</p>
+              <Link className="button primary" href="/auth/login?next=/logistics/orders">
+                {t("account.orders.loginAction")}
+              </Link>
+            </div>
+          </div>
+        ) : isLoading ? (
           <div className="empty-state">{t("orders.loading")}</div>
         ) : error ? (
           <div className="panel">
             <div className="empty-state">{error}</div>
             <div className="button-row">
-              <button className="button primary" type="button" onClick={() => void loadOrders()}>
+              <button className="button primary" type="button" onClick={() => void loadOrders(ownerEmail)}>
                 {t("common.retry")}
               </button>
             </div>
@@ -75,7 +95,7 @@ export function LogisticsOrdersClient() {
           <div className="panel table-panel">
             <div className="table-actions">
               <p className="muted">{t("orders.count", { count: orders.length })}</p>
-              <button className="button" type="button" onClick={() => void loadOrders()}>
+              <button className="button" type="button" onClick={() => void loadOrders(ownerEmail)}>
                 {t("common.refresh")}
               </button>
             </div>

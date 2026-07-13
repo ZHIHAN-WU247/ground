@@ -116,6 +116,7 @@ for each row execute function public.set_updated_at();
 create table if not exists public.file_assets (
   id uuid primary key default gen_random_uuid(),
   owner_user_id uuid references auth.users(id) on delete set null,
+  owner_email text,
   bucket text not null,
   object_path text not null,
   mime_type text,
@@ -350,6 +351,7 @@ for each row execute function public.set_updated_at();
 create table if not exists public.audit_logs (
   id uuid primary key default gen_random_uuid(),
   actor_user_id uuid references auth.users(id) on delete set null,
+  actor_email text,
   action text not null,
   entity_type text not null,
   entity_id uuid,
@@ -465,6 +467,16 @@ drop policy if exists "Public can read active banners" on public.banners;
 create policy "Public can read active banners"
 on public.banners for select
 using (is_active = true);
+
+drop policy if exists "Admins can read audit logs" on public.audit_logs;
+create policy "Admins can read audit logs"
+on public.audit_logs for select
+using (public.current_user_is_admin());
+
+drop policy if exists "Admins can create audit logs" on public.audit_logs;
+create policy "Admins can create audit logs"
+on public.audit_logs for insert
+with check (public.current_user_is_admin());
 
 drop policy if exists "Users can read own shop orders" on public.shop_orders;
 create policy "Users can read own shop orders"

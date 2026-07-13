@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useI18n } from "../../../components/I18nProvider";
-import { authenticateAdminAccount, isFixedAdminAccount } from "../../../lib/admin-auth";
 import { getSafeAuthReturnPath } from "../../../lib/auth-redirect";
 import { findLocalAuthAccountByLogin } from "../../../lib/local-auth";
 import { findLocalUserProfileByEmail, saveLocalUserProfile } from "../../../lib/local-user-profile";
+import { signInWithSupabasePassword } from "../../../lib/supabase-auth";
+import { findPersistentUserProfileByEmail } from "../../../lib/user-profile-api";
 
 const loginCopy = {
   zh: {
@@ -47,46 +48,34 @@ export function LoginForm() {
     window.location.assign(getSafeAuthReturnPath(window.location.search));
   };
 
-  const login = (event: React.FormEvent<HTMLFormElement>) => {
+  const login = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setMessage("");
     setIsSuccess(false);
 
-    const adminResult = authenticateAdminAccount(account, password);
-    const adminProfile = adminResult.ok ? adminResult.profile : null;
+    try {
+      const fallbackAccount = findLocalAuthAccountByLogin(account);
+      const loginEmail = fallbackAccount?.email ?? account;
+      const session = await signInWithSupabasePassword(loginEmail, password);
+      const email = session?.email ?? fallbackAccount?.email ?? account.trim().toLowerCase();
+      const profile = await findPersistentUserProfileByEmail(email) ?? findLocalUserProfileByEmail(email) ?? {
+        name: fallbackAccount?.account ?? email,
+        email,
+        phone: "",
+        country: "China",
+        province: "",
+        city: "",
+        postalCode: "",
+        addressLine: ""
+      };
 
-    if (adminProfile) {
-      saveLocalUserProfile(adminProfile);
-      setMessage(t("auth.login.adminSuccess"));
+      saveLocalUserProfile(profile);
+      setMessage(copy.success);
       setIsSuccess(true);
       redirectAfterAuth();
-    } else if (isFixedAdminAccount(account)) {
-      setMessage(t("auth.login.invalidAdminCredentials"));
-    } else {
-      const authAccount = findLocalAuthAccountByLogin(account);
-
-      if (!authAccount) {
-        setMessage(copy.registerFirst);
-      } else if (authAccount.password !== password) {
-        setMessage(copy.invalidCredentials);
-      } else {
-        const profile = findLocalUserProfileByEmail(authAccount.email) ?? {
-          name: authAccount.account,
-          email: authAccount.email,
-          phone: "",
-          country: "China",
-          province: "",
-          city: "",
-          postalCode: "",
-          addressLine: ""
-        };
-
-        saveLocalUserProfile(profile);
-        setMessage(copy.success);
-        setIsSuccess(true);
-        redirectAfterAuth();
-      }
+    } catch {
+      setMessage(copy.invalidCredentials);
     }
 
     setAccount("");

@@ -2,17 +2,22 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { Plus, ScanLine, Trash2, UserRound } from "lucide-react";
-import type { CargoItem, CargoType, LogisticsOrder, LogisticsRouteId, SupportedDestinationCountry } from "@ground/shared";
+import { Plus, ScanLine, Trash2 } from "lucide-react";
+import { defaultLogisticsPricingRouteConfigs, defaultLogisticsRegionConfigs, type AddressContact, type CargoItem, type CargoType, type LogisticsDeliveryMethod, type LogisticsOrder, type LogisticsPricingRouteConfig, type LogisticsQuote, type LogisticsRegionCountryConfig, type LogisticsRouteId, type SupportedDestinationCountry } from "@ground/shared";
 import { useI18n } from "../../../../components/I18nProvider";
+import { listPersistentAddressBookEntries } from "../../../../lib/address-book-api";
 import { postJson } from "../../../../lib/api";
-import { listAddressBookEntries, mapAddressToOrderFields, type AddressBookEntry } from "../../../../lib/local-address-book";
+import { listPricingRouteConfigs } from "../../../../lib/logistics-pricing-api";
+import { listLogisticsRegions } from "../../../../lib/logistics-regions-api";
+import { mapAddressToOrderFields, type AddressBookEntry } from "../../../../lib/local-address-book";
 import { getActiveLocalUserProfile, type LocalUserProfile } from "../../../../lib/local-user-profile";
-import { quoteRouteOptions } from "../../quote/quote-routes";
+import { quoteRouteOptions, selectQuoteRoutePrice } from "../../quote/quote-routes";
+import { buildOrderCreateQuotePayload, getOrderCreateQuotePayloadKey, type OrderCreateQuotePayload } from "./order-create-quote";
 
 interface OrderFormState {
   cargoType: CargoType;
   routeId: LogisticsRouteId;
+  deliveryMethod: LogisticsDeliveryMethod;
   senderName: string;
   senderPhone: string;
   senderEmail: string;
@@ -34,6 +39,10 @@ interface OrderFormState {
   recipientLocationCode: string;
   recipientFiasGuid: string;
   cargoItems: CargoItemFormRow[];
+  weightKg: string;
+  lengthCm: string;
+  widthCm: string;
+  heightCm: string;
 }
 
 interface CargoItemFormRow {
@@ -55,8 +64,7 @@ type RecipientField =
   | "recipientPostalCode"
   | "recipientAddressLine";
 
-const countryOptions: SupportedDestinationCountry[] = ["Russia", "Kazakhstan", "Belarus"];
-const senderCountryOptions = ["China", "Russia"];
+const deliveryMethodOptions: LogisticsDeliveryMethod[] = ["TO_DOOR", "TO_WAREHOUSE"];
 
 const createCargoItemRow = (id: string): CargoItemFormRow => ({
   id,
@@ -68,6 +76,7 @@ const createCargoItemRow = (id: string): CargoItemFormRow => ({
 const initialState: OrderFormState = {
   cargoType: "B2C",
   routeId: "air-cdek",
+  deliveryMethod: "TO_DOOR",
   senderName: "",
   senderPhone: "",
   senderEmail: "",
@@ -88,7 +97,22 @@ const initialState: OrderFormState = {
   recipientAddressLine: "",
   recipientLocationCode: "",
   recipientFiasGuid: "",
-  cargoItems: [createCargoItemRow("cargo-1")]
+  cargoItems: [createCargoItemRow("cargo-1")],
+  weightKg: "",
+  lengthCm: "",
+  widthCm: "",
+  heightCm: ""
+};
+
+const fallbackSender: AddressContact = {
+  name: "Ground warehouse",
+  phone: "+86 755 0000 1234",
+  email: "warehouse@ground.test",
+  country: "China",
+  province: "Guangdong",
+  city: "Shenzhen",
+  postalCode: "518000",
+  addressLine: "Ground default warehouse"
 };
 
 function formatQuoteAmount(quote: { amount: number; currency: string }) {
@@ -112,6 +136,28 @@ const importSenderProfile = (current: OrderFormState, profile: LocalUserProfile)
   ...current,
   ...senderProfileToFields(profile)
 });
+
+const buildSenderPayload = (form: OrderFormState): AddressContact => ({
+  name: form.senderName.trim() || fallbackSender.name,
+  phone: form.senderPhone.trim() || fallbackSender.phone,
+  ...(form.senderEmail.trim() || fallbackSender.email ? { email: form.senderEmail.trim() || fallbackSender.email } : {}),
+  country: form.senderCountry.trim() || fallbackSender.country,
+  province: form.senderProvince.trim() || fallbackSender.province,
+  city: form.senderCity.trim() || fallbackSender.city,
+  postalCode: form.senderPostalCode.trim() || fallbackSender.postalCode,
+  addressLine: form.senderAddressLine.trim() || fallbackSender.addressLine,
+  ...(form.senderLocationCode.trim() ? { locationCode: form.senderLocationCode.trim() } : {}),
+  ...(form.senderFiasGuid.trim() ? { fiasGuid: form.senderFiasGuid.trim() } : {})
+});
+
+const parseDeliveryMethod = (value: string | null): LogisticsDeliveryMethod | undefined =>
+  deliveryMethodOptions.includes(value as LogisticsDeliveryMethod) ? (value as LogisticsDeliveryMethod) : undefined;
+
+const getPositiveSearchValue = (value: string | null) => {
+  const parsed = Number(value);
+
+  return Number.isFinite(parsed) && parsed > 0 ? value ?? "" : "";
+};
 
 const getLabeledValue = (lines: string[], labels: string[]) => {
   const escapedLabels = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
@@ -209,9 +255,7 @@ function FieldLabel({ htmlFor, label, required = true }: { htmlFor: string; labe
 export function OrderCreateForm() {
   const { t } = useI18n();
   const [form, setForm] = useState(initialState);
-  const [senderAddressBook, setSenderAddressBook] = useState<AddressBookEntry[]>([]);
   const [recipientAddressBook, setRecipientAddressBook] = useState<AddressBookEntry[]>([]);
-  const [selectedSenderAddressId, setSelectedSenderAddressId] = useState("");
   const [selectedRecipientAddressId, setSelectedRecipientAddressId] = useState("");
   const [recipientRawInfo, setRecipientRawInfo] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -219,8 +263,17 @@ export function OrderCreateForm() {
   const [assistMessage, setAssistMessage] = useState("");
   const [isAssistSuccess, setIsAssistSuccess] = useState(false);
   const [createdOrder, setCreatedOrder] = useState<LogisticsOrder | null>(null);
+  const [estimatedQuote, setEstimatedQuote] = useState<LogisticsQuote | null>(null);
+  const [routeConfigs, setRouteConfigs] = useState<LogisticsPricingRouteConfig[]>(defaultLogisticsPricingRouteConfigs);
+  const [regions, setRegions] = useState<LogisticsRegionCountryConfig[]>(defaultLogisticsRegionConfigs);
+  const [quoteError, setQuoteError] = useState("");
+  const [isQuoteLoading, setIsQuoteLoading] = useState(false);
+  const [quoteRequestKey, setQuoteRequestKey] = useState("");
 
   useEffect(() => {
+    void listPricingRouteConfigs().then(setRouteConfigs);
+    void listLogisticsRegions().then(setRegions);
+
     const profile = getActiveLocalUserProfile();
     const ownerEmail = profile?.email ?? "";
 
@@ -228,12 +281,28 @@ export function OrderCreateForm() {
       setForm((current) => importSenderProfile(current, profile));
     }
 
-    const senders = listAddressBookEntries({ ownerEmail, kind: "sender" });
-    const recipients = listAddressBookEntries({ ownerEmail, kind: "recipient" });
-    setSenderAddressBook(senders);
-    setRecipientAddressBook(recipients);
-    setSelectedSenderAddressId(senders[0]?.id ?? "");
-    setSelectedRecipientAddressId(recipients[0]?.id ?? "");
+    void listPersistentAddressBookEntries({ ownerEmail, kind: "recipient" }).then((recipients) => {
+      setRecipientAddressBook(recipients);
+      setSelectedRecipientAddressId(recipients[0]?.id ?? "");
+    });
+  }, []);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const deliveryMethod = parseDeliveryMethod(searchParams.get("deliveryMethod"));
+    const weightKg = getPositiveSearchValue(searchParams.get("weightKg"));
+    const lengthCm = getPositiveSearchValue(searchParams.get("lengthCm"));
+    const widthCm = getPositiveSearchValue(searchParams.get("widthCm"));
+    const heightCm = getPositiveSearchValue(searchParams.get("heightCm"));
+
+    setForm((current) => ({
+      ...current,
+      ...(deliveryMethod ? { deliveryMethod } : {}),
+      ...(weightKg ? { weightKg } : {}),
+      ...(lengthCm ? { lengthCm } : {}),
+      ...(widthCm ? { widthCm } : {}),
+      ...(heightCm ? { heightCm } : {})
+    }));
   }, []);
 
   const updateField = <K extends keyof OrderFormState>(field: K, value: OrderFormState[K]) => {
@@ -273,33 +342,73 @@ export function OrderCreateForm() {
       : null;
   };
 
-  const importActiveSenderProfile = () => {
-    const profile = getActiveLocalUserProfile();
+  const buildPackagePayload = () => {
+    const packagePayload = {
+      weightKg: Number(form.weightKg),
+      lengthCm: Number(form.lengthCm),
+      widthCm: Number(form.widthCm),
+      heightCm: Number(form.heightCm),
+      packageCount: 1
+    };
 
-    if (!profile) {
-      setAssistMessage(t("orderCreate.sender.profileMissing"));
-      setIsAssistSuccess(false);
-      return;
-    }
-
-    setForm((current) => importSenderProfile(current, profile));
-    setAssistMessage(t("orderCreate.sender.profileImported"));
-    setIsAssistSuccess(true);
+    return [packagePayload.weightKg, packagePayload.lengthCm, packagePayload.widthCm, packagePayload.heightCm].every((value) => Number.isFinite(value) && value > 0)
+      ? packagePayload
+      : null;
   };
 
-  const importSavedSender = () => {
-    const entry = senderAddressBook.find((item) => item.id === selectedSenderAddressId) ?? senderAddressBook[0];
+  const buildQuotePayload = (): OrderCreateQuotePayload | null =>
+    buildOrderCreateQuotePayload({
+      cargoType: form.cargoType,
+      recipientCountry: form.recipientCountry,
+      recipientCity: form.recipientCity,
+      recipientPostalCode: form.recipientPostalCode,
+      recipientAddressLine: form.recipientAddressLine,
+      deliveryMethod: form.deliveryMethod,
+      weightKg: form.weightKg,
+      lengthCm: form.lengthCm,
+      widthCm: form.widthCm,
+      heightCm: form.heightCm
+    });
 
-    if (!entry) {
-      setAssistMessage(t("orderCreate.sender.addressBookEmpty"));
-      setIsAssistSuccess(false);
+  const currentQuotePayload = buildQuotePayload();
+  const currentQuotePayloadKey = currentQuotePayload ? getOrderCreateQuotePayloadKey(currentQuotePayload, form.routeId) : "";
+  const isConfirmedQuoteCurrent = Boolean(estimatedQuote && quoteRequestKey && quoteRequestKey === currentQuotePayloadKey);
+  const isQuoteErrorCurrent = Boolean(quoteError && quoteRequestKey && quoteRequestKey === currentQuotePayloadKey);
+  const routeOptions = routeConfigs
+    .filter((route) => route.isActive)
+    .sort((current, next) => current.sortOrder - next.sortOrder)
+    .map((route) => ({ id: route.routeId, labelKey: route.labelKey, noteKey: route.noteKey }));
+  const selectedRoute = routeOptions.find((route) => route.id === form.routeId);
+  const countryOptions = getDestinationCountryOptions(regions);
+  const cityOptions = regions.find((country) => country.name === form.recipientCountry)?.cities.filter((city) => city.isActive) ?? [];
+  const selectedRouteQuotePrice = estimatedQuote && isConfirmedQuoteCurrent ? selectQuoteRoutePrice(estimatedQuote, form.routeId, routeConfigs) : undefined;
+  const displayedQuotePrice = selectedRouteQuotePrice ?? (estimatedQuote && estimatedQuote.cargoType !== "B2C" ? { amount: estimatedQuote.totalAmount ?? estimatedQuote.amount, currency: estimatedQuote.currency } : undefined);
+
+  const confirmPrice = async () => {
+    const payload = buildQuotePayload();
+
+    if (!payload) {
+      setQuoteError(t("orderCreate.quote.incomplete"));
+      setEstimatedQuote(null);
+      setQuoteRequestKey("");
       return;
     }
 
-    setForm((current) => ({ ...current, ...mapAddressToOrderFields(entry, "sender") }));
-    setSelectedSenderAddressId(entry.id);
-    setAssistMessage(t("orderCreate.sender.addressImported"));
-    setIsAssistSuccess(true);
+    const requestKey = getOrderCreateQuotePayloadKey(payload, form.routeId);
+    setIsQuoteLoading(true);
+    setQuoteError("");
+    setEstimatedQuote(null);
+    setQuoteRequestKey(requestKey);
+
+    try {
+      const quote = await postJson<LogisticsQuote, OrderCreateQuotePayload>("/logistics/quotes", payload);
+      setEstimatedQuote(quote);
+    } catch (caught) {
+      const message = caught instanceof Error ? caught.message : "Quote request failed";
+      setQuoteError(t("orderCreate.quote.error", { message }));
+    } finally {
+      setIsQuoteLoading(false);
+    }
   };
 
   const importSavedRecipient = () => {
@@ -351,6 +460,8 @@ export function OrderCreateForm() {
 
     try {
       const cargoItems = buildCargoItemsPayload();
+      const packagePayload = buildPackagePayload();
+      const quotePayload = buildQuotePayload();
 
       if (!cargoItems) {
         setMessage(t("orderCreate.cargo.itemsInvalid"));
@@ -358,21 +469,35 @@ export function OrderCreateForm() {
         return;
       }
 
+      if (!packagePayload) {
+        setMessage(t("orderCreate.package.invalid"));
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!quotePayload) {
+        setMessage(t("orderCreate.quote.incomplete"));
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (isQuoteLoading || quoteError || !estimatedQuote || quoteRequestKey !== getOrderCreateQuotePayloadKey(quotePayload, form.routeId)) {
+        setMessage(t("orderCreate.quote.required"));
+        setIsSubmitting(false);
+        return;
+      }
+
+      if (!displayedQuotePrice) {
+        setMessage(t("orderCreate.quote.routeMissing"));
+        setIsSubmitting(false);
+        return;
+      }
+
       const order = await postJson<LogisticsOrder, object>("/logistics/orders", {
         cargoType: form.cargoType,
         routeId: form.routeId,
-        sender: {
-          name: form.senderName,
-          phone: form.senderPhone,
-          email: form.senderEmail.trim() || undefined,
-          country: form.senderCountry,
-          province: form.senderProvince,
-          city: form.senderCity,
-          postalCode: form.senderPostalCode,
-          addressLine: form.senderAddressLine,
-          locationCode: form.senderLocationCode.trim() || undefined,
-          fiasGuid: form.senderFiasGuid.trim() || undefined
-        },
+        deliveryMethod: form.deliveryMethod,
+        sender: buildSenderPayload(form),
         recipient: {
           name: form.recipientName,
           phone: form.recipientPhone,
@@ -385,7 +510,8 @@ export function OrderCreateForm() {
           locationCode: form.recipientLocationCode.trim() || undefined,
           fiasGuid: form.recipientFiasGuid.trim() || undefined
         },
-        cargoItems
+        cargoItems,
+        ...packagePayload
       });
 
       setCreatedOrder(order);
@@ -402,11 +528,33 @@ export function OrderCreateForm() {
     <form className="panel" onSubmit={submitOrder}>
       <div className="form-section-heading">
         <p className="eyebrow">{t("orderCreate.step")}</p>
+        <h3>{t("orderCreate.delivery.title")}</h3>
+        <p className="muted">{t("orderCreate.delivery.note")}</p>
+      </div>
+      <div className="route-choice-grid" role="radiogroup" aria-label={t("orderCreate.delivery.title")}>
+        {deliveryMethodOptions.map((method) => (
+          <label key={method} className={`route-choice-card${form.deliveryMethod === method ? " active" : ""}`}>
+            <input
+              type="radio"
+              name="deliveryMethod"
+              value={method}
+              checked={form.deliveryMethod === method}
+              onChange={(event) => updateField("deliveryMethod", event.target.value as LogisticsDeliveryMethod)}
+            />
+            <span className="route-choice-copy">
+              <strong>{t(`deliveryMethod.${method}`)}</strong>
+              <small>{t(`orderCreate.delivery.${method}.note`)}</small>
+            </span>
+          </label>
+        ))}
+      </div>
+
+      <div className="form-section-heading separated">
         <h3>{t("orderCreate.route.title")}</h3>
         <p className="muted">{t("orderCreate.route.note")}</p>
       </div>
       <div className="route-choice-grid" role="radiogroup" aria-label={t("orderCreate.route.title")}>
-        {quoteRouteOptions.map((route) => (
+        {routeOptions.map((route) => (
           <label key={route.id} className={`route-choice-card${form.routeId === route.id ? " active" : ""}`}>
             <input
               type="radio"
@@ -498,46 +646,13 @@ export function OrderCreateForm() {
       </div>
 
       <div className="form-section-heading separated section-heading-row">
-        <h3>{t("orderCreate.sender.title")}</h3>
-        <button className="button" type="button" onClick={importActiveSenderProfile}>
-          <UserRound aria-hidden="true" />
-          {t("orderCreate.sender.importProfile")}
-        </button>
+        <h3>{t("orderCreate.package.title")}</h3>
       </div>
-      <div className="address-import-row">
-        <select value={selectedSenderAddressId} onChange={(event) => setSelectedSenderAddressId(event.target.value)}>
-          <option value="">{t("orderCreate.addressBook.selectPlaceholder")}</option>
-          {senderAddressBook.map((entry) => (
-            <option key={entry.id} value={entry.id}>
-              {entry.label} / {entry.city}
-            </option>
-          ))}
-        </select>
-        <button className="button" type="button" onClick={importSavedSender}>
-          {t("orderCreate.sender.importAddressBook")}
-        </button>
-      </div>
-      <p className="muted">{t("orderCreate.locationHint")}</p>
       <div className="form-grid">
-        <div className="field"><FieldLabel htmlFor="senderName" label={t("orderCreate.label.senderName")} /><input id="senderName" value={form.senderName} onChange={(event) => updateField("senderName", event.target.value)} required /></div>
-        <div className="field"><FieldLabel htmlFor="senderPhone" label={t("orderCreate.label.senderPhone")} /><input id="senderPhone" value={form.senderPhone} onChange={(event) => updateField("senderPhone", event.target.value)} required /></div>
-        <div className="field"><FieldLabel htmlFor="senderEmail" label={t("orderCreate.label.senderEmail")} /><input id="senderEmail" type="email" value={form.senderEmail} onChange={(event) => updateField("senderEmail", event.target.value)} required /></div>
-        <div className="field">
-          <FieldLabel htmlFor="senderCountry" label={t("orderCreate.label.senderCountry")} />
-          <select id="senderCountry" value={form.senderCountry} onChange={(event) => updateField("senderCountry", event.target.value)} required>
-            {senderCountryOptions.map((country) => (
-              <option key={country} value={country}>
-                {t(`country.${country}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div className="field"><FieldLabel htmlFor="senderProvince" label={t("orderCreate.label.senderProvince")} /><input id="senderProvince" value={form.senderProvince} onChange={(event) => updateField("senderProvince", event.target.value)} required /></div>
-        <div className="field"><FieldLabel htmlFor="senderCity" label={t("orderCreate.label.senderCity")} /><input id="senderCity" value={form.senderCity} onChange={(event) => updateField("senderCity", event.target.value)} required /></div>
-        <div className="field"><FieldLabel htmlFor="senderPostalCode" label={t("orderCreate.label.senderPostalCode")} /><input id="senderPostalCode" value={form.senderPostalCode} onChange={(event) => updateField("senderPostalCode", event.target.value)} required /></div>
-        <div className="field"><FieldLabel htmlFor="senderLocationCode" label={t("orderCreate.label.senderLocationCode")} required={false} /><input id="senderLocationCode" value={form.senderLocationCode} onChange={(event) => updateField("senderLocationCode", event.target.value)} /></div>
-        <div className="field"><FieldLabel htmlFor="senderFiasGuid" label={t("orderCreate.label.senderFiasGuid")} required={false} /><input id="senderFiasGuid" value={form.senderFiasGuid} onChange={(event) => updateField("senderFiasGuid", event.target.value)} /></div>
-        <div className="field full"><FieldLabel htmlFor="senderAddressLine" label={t("orderCreate.label.senderAddress")} /><input id="senderAddressLine" value={form.senderAddressLine} onChange={(event) => updateField("senderAddressLine", event.target.value)} required /></div>
+        <div className="field"><FieldLabel htmlFor="packageWeightKg" label={t("orderCreate.package.weightKg")} /><input id="packageWeightKg" type="number" min="0.01" step="0.01" value={form.weightKg} onChange={(event) => updateField("weightKg", event.target.value)} required /></div>
+        <div className="field"><FieldLabel htmlFor="packageLengthCm" label={t("orderCreate.package.lengthCm")} /><input id="packageLengthCm" type="number" min="0.01" step="0.01" value={form.lengthCm} onChange={(event) => updateField("lengthCm", event.target.value)} required /></div>
+        <div className="field"><FieldLabel htmlFor="packageWidthCm" label={t("orderCreate.package.widthCm")} /><input id="packageWidthCm" type="number" min="0.01" step="0.01" value={form.widthCm} onChange={(event) => updateField("widthCm", event.target.value)} required /></div>
+        <div className="field"><FieldLabel htmlFor="packageHeightCm" label={t("orderCreate.package.heightCm")} /><input id="packageHeightCm" type="number" min="0.01" step="0.01" value={form.heightCm} onChange={(event) => updateField("heightCm", event.target.value)} required /></div>
       </div>
 
       <div className="form-section-heading separated section-heading-row">
@@ -586,11 +701,52 @@ export function OrderCreateForm() {
           </select>
         </div>
         <div className="field"><FieldLabel htmlFor="recipientProvince" label={t("orderCreate.label.recipientProvince")} /><input id="recipientProvince" value={form.recipientProvince} onChange={(event) => updateField("recipientProvince", event.target.value)} required /></div>
-        <div className="field"><FieldLabel htmlFor="recipientCity" label={t("orderCreate.label.recipientCity")} /><input id="recipientCity" value={form.recipientCity} onChange={(event) => updateField("recipientCity", event.target.value)} required /></div>
+        <div className="field">
+          <FieldLabel htmlFor="recipientCity" label={t("orderCreate.label.recipientCity")} />
+          <input id="recipientCity" list="recipientCityOptions" value={form.recipientCity} onChange={(event) => updateField("recipientCity", event.target.value)} required />
+          <datalist id="recipientCityOptions">
+            {cityOptions.map((city) => <option key={city.id} value={city.name} />)}
+          </datalist>
+        </div>
         <div className="field"><FieldLabel htmlFor="recipientPostalCode" label={t("orderCreate.label.recipientPostalCode")} /><input id="recipientPostalCode" value={form.recipientPostalCode} onChange={(event) => updateField("recipientPostalCode", event.target.value)} required /></div>
         <div className="field"><FieldLabel htmlFor="recipientLocationCode" label={t("orderCreate.label.recipientLocationCode")} required={false} /><input id="recipientLocationCode" value={form.recipientLocationCode} onChange={(event) => updateField("recipientLocationCode", event.target.value)} /></div>
         <div className="field"><FieldLabel htmlFor="recipientFiasGuid" label={t("orderCreate.label.recipientFiasGuid")} required={false} /><input id="recipientFiasGuid" value={form.recipientFiasGuid} onChange={(event) => updateField("recipientFiasGuid", event.target.value)} /></div>
         <div className="field full"><FieldLabel htmlFor="recipientAddressLine" label={t("orderCreate.label.recipientAddress")} /><input id="recipientAddressLine" value={form.recipientAddressLine} onChange={(event) => updateField("recipientAddressLine", event.target.value)} required /></div>
+      </div>
+
+      <div className="form-section-heading separated">
+        <p className="eyebrow">{t("orderCreate.quote.eyebrow")}</p>
+        <h3>{t("orderCreate.quote.title")}</h3>
+        <p className="muted">{t("orderCreate.quote.note")}</p>
+      </div>
+      <div className="empty-state order-confirmation">
+        {!currentQuotePayload ? (
+          <p>{t("orderCreate.quote.incomplete")}</p>
+        ) : isQuoteLoading ? (
+          <p>{t("orderCreate.quote.loading")}</p>
+        ) : isQuoteErrorCurrent ? (
+          <p className="status danger">{quoteError}</p>
+        ) : estimatedQuote && isConfirmedQuoteCurrent && !displayedQuotePrice ? (
+          <p className="status danger">{t("orderCreate.quote.routeMissing")}</p>
+        ) : estimatedQuote && isConfirmedQuoteCurrent && displayedQuotePrice ? (
+          <>
+            <strong>{t("orderCreate.quote.finalAmount", { value: formatQuoteAmount(displayedQuotePrice) })}</strong>
+            {selectedRoute ? <p>{t("orderCreate.quote.route", { value: t(selectedRoute.labelKey) })}</p> : null}
+            <p>{t("quote.result.deliveryMethod", { method: t(`deliveryMethod.${estimatedQuote.deliveryMethod}`) })}</p>
+            <p>{t("orderCreate.quote.chargeable", { value: estimatedQuote.chargeableWeightKg })}</p>
+            <p>{t("orderCreate.quote.actualVolumetric", { actual: estimatedQuote.actualWeightKg, volumetric: estimatedQuote.volumetricWeightKg })}</p>
+            <p>{t("orderCreate.quote.savedHint")}</p>
+          </>
+        ) : estimatedQuote || quoteError ? (
+          <p>{t("orderCreate.quote.stale")}</p>
+        ) : (
+          <p>{t("orderCreate.quote.unconfirmed")}</p>
+        )}
+        <div className="button-row compact">
+          <button className="button" type="button" onClick={confirmPrice} disabled={isQuoteLoading}>
+            {isQuoteLoading ? t("orderCreate.quote.confirming") : t("orderCreate.quote.confirmButton")}
+          </button>
+        </div>
       </div>
 
       <div className="button-row">
@@ -603,13 +759,13 @@ export function OrderCreateForm() {
         <div className="empty-state order-confirmation">
           <strong>{t("orderCreate.confirm.orderNo", { orderNo: createdOrder.orderNo })}</strong>
           <p>{t("orderCreate.confirm.trackingNo", { trackingNo: createdOrder.trackingNo ?? t("common.pending") })}</p>
-          {createdOrder.estimatedQuote ? (
-            <p>{t("orderCreate.confirm.quote", { value: formatQuoteAmount(createdOrder.estimatedQuote) })}</p>
-          ) : null}
           <p>{t("orderCreate.confirm.note")}</p>
           <div className="button-row">
             <Link className="button primary" href={`/logistics/orders/${createdOrder.id}`}>
               {t("orderCreate.confirm.viewOrder")}
+            </Link>
+            <Link className="button" href="/account/orders">
+              {t("orderCreate.confirm.myOrders")}
             </Link>
             <Link className="button" href={`/logistics/tracking`}>
               {t("orderCreate.confirm.lookupTracking")}
@@ -619,4 +775,13 @@ export function OrderCreateForm() {
       ) : null}
     </form>
   );
+}
+
+function getDestinationCountryOptions(regions: LogisticsRegionCountryConfig[]): SupportedDestinationCountry[] {
+  const values = regions
+    .filter((country) => country.isActive && country.name !== "China")
+    .map((country) => country.name)
+    .filter((name): name is SupportedDestinationCountry => name === "Russia" || name === "Kazakhstan" || name === "Belarus");
+
+  return values.length > 0 ? values : ["Russia", "Kazakhstan", "Belarus"];
 }

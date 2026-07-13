@@ -1,5 +1,4 @@
 import type { AddressContact } from "@ground/shared";
-import { getFixedAdminEmail, isFixedAdminEmail } from "./admin-auth";
 
 const ACTIVE_PROFILE_KEY = "ground.activeUserProfile";
 const PROFILE_INDEX_KEY = "ground.userProfiles";
@@ -20,19 +19,6 @@ const notifyProfileChange = () => {
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
 const asString = (value: unknown) => (typeof value === "string" ? value.trim() : "");
-
-const getAdminEmailAllowlist = () => {
-  const configured = process.env.NEXT_PUBLIC_LOCAL_ADMIN_EMAILS
-    ?.split(",")
-    .map((item) => item.trim().toLowerCase())
-    .filter(Boolean);
-
-  if (configured && configured.length > 0) {
-    return Array.from(new Set([...configured, getFixedAdminEmail()]));
-  }
-
-  return ["admin@ground.local", "ops@ground.local", getFixedAdminEmail()];
-};
 
 const normalizeProfile = (profile: Partial<LocalUserProfile>): LocalUserProfile => {
   const locationCode = asString(profile.locationCode);
@@ -147,30 +133,4 @@ export const clearActiveLocalUserProfile = () => {
 
   window.localStorage.removeItem(ACTIVE_PROFILE_KEY);
   notifyProfileChange();
-};
-
-export const hasLocalAdminAccess = () => {
-  const profile = getActiveLocalUserProfile();
-  const email = profile?.email?.trim().toLowerCase();
-
-  if (!email) {
-    return false;
-  }
-
-  return isFixedAdminEmail(email) || getAdminEmailAllowlist().includes(email);
-};
-
-export const getActiveLocalAdminEmail = () => {
-  const profile = getActiveLocalUserProfile();
-  const email = profile?.email?.trim().toLowerCase();
-
-  if (!email || !getAdminEmailAllowlist().includes(email)) {
-    if (email && isFixedAdminEmail(email)) {
-      return email;
-    }
-
-    return "";
-  }
-
-  return email;
 };

@@ -1,18 +1,18 @@
-import Link from "next/link";
-import { T } from "../../components/I18nProvider";
+"use client";
 
-const accountLinks = [
-  { href: "/account/profile", labelKey: "account.nav.profile" },
-  { href: "/account/senders", labelKey: "account.nav.senders" },
-  { href: "/account/recipients", labelKey: "account.nav.recipients" },
-  { href: "/account/documents", labelKey: "account.nav.documents" }
-];
+import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { T } from "../../components/I18nProvider";
+import { accountLinks, getActiveAccountHref } from "./account-navigation";
 
 export function AccountNav() {
+  const pathname = usePathname();
+  const activeHref = getActiveAccountHref(pathname);
+
   return (
     <div className="shell account-nav" aria-label="Account navigation">
       {accountLinks.map((item) => (
-        <Link className="button" href={item.href} key={item.href}>
+        <Link className={item.href === activeHref ? "button active" : "button"} href={item.href} key={item.href}>
           <T id={item.labelKey} />
         </Link>
       ))}

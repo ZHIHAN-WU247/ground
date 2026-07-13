@@ -1,5 +1,11 @@
-import { PageHero } from "../../../../components/PageHero";
+import { AdminAuditLogsClient } from "./AdminAuditLogsClient";
 
 export default function AdminLogsPage() {
-  return <PageHero eyebrowKey="admin.logistics.logs.eyebrow" titleKey="admin.logistics.logs.title" descriptionKey="admin.logistics.logs.description" />;
+  return (
+    <main className="admin-audit-logs-page">
+      <section className="shell section">
+        <AdminAuditLogsClient />
+      </section>
+    </main>
+  );
 }

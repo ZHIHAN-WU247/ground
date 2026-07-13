@@ -8,6 +8,9 @@ import { StatusBadge } from "../../../../components/StatusBadge";
 import { TrackingTimeline } from "../../../../components/TrackingTimeline";
 import { useI18n } from "../../../../components/I18nProvider";
 import { getJson } from "../../../../lib/api";
+import { getActiveLocalUserProfile } from "../../../../lib/local-user-profile";
+import { getSupabaseAccessToken } from "../../../../lib/supabase-auth";
+import { getLogisticsOrderDetailLoginHref, hasLogisticsOrderDetailIdentity } from "../logistics-order-detail-auth";
 
 const supportEmail = "support@ground.local";
 
@@ -17,6 +20,7 @@ export function LogisticsOrderDetailClient({ id }: { id: string }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [error, setError] = useState("");
+  const [hasIdentity, setHasIdentity] = useState(false);
 
   const loadOrder = async (mode: "initial" | "refresh" = "initial") => {
     if (mode === "initial") {
@@ -43,6 +47,14 @@ export function LogisticsOrderDetailClient({ id }: { id: string }) {
   };
 
   useEffect(() => {
+    const canLoadOrder = hasLogisticsOrderDetailIdentity(getActiveLocalUserProfile(), getSupabaseAccessToken());
+    setHasIdentity(canLoadOrder);
+
+    if (!canLoadOrder) {
+      setIsLoading(false);
+      return;
+    }
+
     void loadOrder();
   }, [id, t]);
 
@@ -62,17 +74,37 @@ export function LogisticsOrderDetailClient({ id }: { id: string }) {
     return <div className="empty-state">{t("orders.detail.loading")}</div>;
   }
 
+  if (!hasIdentity) {
+    return (
+      <div className="panel">
+        <div className="empty-state">
+          <h2>{t("account.orders.loginTitle")}</h2>
+          <p>{t("account.orders.loginBody")}</p>
+          <Link className="button primary" href={getLogisticsOrderDetailLoginHref(id)}>
+            {t("account.orders.loginAction")}
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (error || !order) {
     return <div className="empty-state">{error || t("orders.detail.missing")}</div>;
   }
 
   const isRejected = order.status === "REJECTED";
-  const estimatedQuote = order.estimatedQuote ? `${order.estimatedQuote.amount.toFixed(2)} ${order.estimatedQuote.currency}` : t("orders.summary.quotePending");
+  const recipientAddress = [
+    order.recipient.addressLine,
+    order.recipient.city,
+    order.recipient.province,
+    order.recipient.postalCode,
+    order.recipient.country
+  ].filter(Boolean).join(", ");
 
   return (
-    <div className="grid two">
+    <div className="grid two order-detail-grid">
       <div className="grid">
-        <div className="panel">
+        <div className="panel order-summary-card">
           <div className="detail-head">
             <StatusBadge status={order.status} />
             <button className="button" type="button" onClick={() => void loadOrder("refresh")} disabled={isRefreshing}>
@@ -85,7 +117,7 @@ export function LogisticsOrderDetailClient({ id }: { id: string }) {
           <p>{t("orders.summary.reviewState", { value: t(`admin.reviewState.${order.reviewState}`) })}</p>
           <p>{t("orders.summary.labelStatus", { value: order.labelStatus ?? "NOT_REQUESTED" })}</p>
           <p>{t("orders.summary.trackingSync", { value: order.trackingSyncStatus ?? "NOT_STARTED" })}</p>
-          <p>{t("orders.summary.quote", { value: estimatedQuote })}</p>
+          <p>{t("orders.summary.recipientAddress", { value: recipientAddress })}</p>
           {order.estimatedQuote ? (
             <p>{t("orders.summary.quoteChargeable", { value: order.estimatedQuote.chargeableWeightKg.toFixed(2) })}</p>
           ) : null}

@@ -5,8 +5,11 @@ import type {
   CargoItem,
   CurrencyCode,
   LogisticsOrder,
+  LogisticsPricingRouteConfig,
   LogisticsQuote,
   LogisticsQuoteRequest,
+  LogisticsRegionCityConfig,
+  LogisticsRegionCountryConfig,
   LogisticsQuoteSnapshot,
   LogisticsReviewState,
   LogisticsRouteId,
@@ -22,6 +25,12 @@ import type { ManualTrackingNumberDto } from "./dto/manual-tracking-number.dto";
 import type { ReviewOrderDto } from "./dto/review-order.dto";
 import type { TrackingEventDto } from "./dto/tracking-event.dto";
 import { CdekCarrierProvider } from "../carrier/cdek-carrier.provider";
+import { SupabaseService } from "../database/supabase.service";
+import { SupabaseCustomerRiskGuard, type SupabaseCustomerRiskClient } from "../customer-risk/supabase-customer-risk-guard";
+import { SupabaseLogisticsOrderStore, type SupabaseLogisticsOrderClient } from "./supabase-logistics-order-store";
+import { SupabasePricingConfigStore, type SupabasePricingConfigClient, defaultPricingRouteConfigs } from "./supabase-pricing-config-store";
+import { SupabaseRegionConfigStore, type SupabaseRegionConfigClient } from "./supabase-region-config-store";
+import { defaultLogisticsRegionConfigs } from "@ground/shared";
 
 const statusGroupMap: Record<Exclude<LogisticsStatusGroup, "ALL">, LogisticsStatus[]> = {
   REVIEW_QUEUE: ["UNDER_REVIEW"],
@@ -37,6 +46,10 @@ export const LOGISTICS_STORE_PATH = "LOGISTICS_STORE_PATH";
 @Injectable()
 export class LogisticsService {
   private readonly orders: LogisticsOrder[];
+  private readonly orderStore?: SupabaseLogisticsOrderStore;
+  private readonly pricingConfigStore?: SupabasePricingConfigStore;
+  private readonly regionConfigStore?: SupabaseRegionConfigStore;
+  private readonly customerRiskGuard?: SupabaseCustomerRiskGuard;
   private readonly cdekOriginLocation = {
     country: "Russia",
     province: "Moscow",
@@ -51,26 +64,99 @@ export class LogisticsService {
     private readonly carrierProvider: FixedCarrierProvider,
     private readonly cdekCarrierProvider: CdekCarrierProvider,
     @Optional() @Inject(LOGISTICS_STORE_PATH)
-    private readonly storePath = resolve(process.cwd(), "data/logistics-orders.json")
+    private readonly storePath = resolve(process.cwd(), "data/logistics-orders.json"),
+    @Optional() private readonly supabaseService?: SupabaseService
   ) {
     this.orders = this.readOrders();
+
+    if (this.supabaseService?.client) {
+      this.orderStore = new SupabaseLogisticsOrderStore(this.supabaseService.client as unknown as SupabaseLogisticsOrderClient);
+      this.pricingConfigStore = new SupabasePricingConfigStore(this.supabaseService.client as unknown as SupabasePricingConfigClient);
+      this.regionConfigStore = new SupabaseRegionConfigStore(this.supabaseService.client as unknown as SupabaseRegionConfigClient);
+      this.customerRiskGuard = new SupabaseCustomerRiskGuard(this.supabaseService.client as unknown as SupabaseCustomerRiskClient);
+    }
   }
 
-  listOrders(): LogisticsOrder[] {
-    return this.orders;
+  async listRegionConfigs(): Promise<LogisticsRegionCountryConfig[]> {
+    if (!this.regionConfigStore) {
+      return defaultLogisticsRegionConfigs;
+    }
+
+    await this.regionConfigStore.seedDefaultsIfEmpty();
+    return this.regionConfigStore.listRegions();
   }
 
-  listAdminOrders(statusGroup: LogisticsStatusGroup = "ALL"): LogisticsOrder[] {
+  async updateRegionCountry(isoCode: string, patch: Partial<Pick<LogisticsRegionCountryConfig, "isActive" | "name">>): Promise<LogisticsRegionCountryConfig> {
+    if (!this.regionConfigStore) {
+      throw new BadRequestException("Supabase is required to update region config.");
+    }
+
+    await this.regionConfigStore.seedDefaultsIfEmpty();
+    return this.regionConfigStore.updateCountry(isoCode, patch);
+  }
+
+  async updateRegionCity(cityId: string, patch: Partial<LogisticsRegionCityConfig>): Promise<LogisticsRegionCityConfig> {
+    if (!this.regionConfigStore) {
+      throw new BadRequestException("Supabase is required to update region config.");
+    }
+
+    await this.regionConfigStore.seedDefaultsIfEmpty();
+    return this.regionConfigStore.updateCity(cityId, patch);
+  }
+
+  async listPricingRouteConfigs(): Promise<LogisticsPricingRouteConfig[]> {
+    if (!this.pricingConfigStore) {
+      return defaultPricingRouteConfigs;
+    }
+
+    await this.pricingConfigStore.seedDefaultsIfEmpty();
+    return this.pricingConfigStore.listRouteConfigs();
+  }
+
+  async updatePricingRouteConfig(routeId: LogisticsRouteId, patch: Partial<LogisticsPricingRouteConfig>): Promise<LogisticsPricingRouteConfig> {
+    if (!this.pricingConfigStore) {
+      throw new BadRequestException("Supabase is required to update pricing config.");
+    }
+
+    await this.pricingConfigStore.seedDefaultsIfEmpty();
+    return this.pricingConfigStore.updateRouteConfig(routeId, patch);
+  }
+
+  async listOrders(ownerEmail?: string): Promise<LogisticsOrder[]> {
+    if (this.orderStore) {
+      return this.orderStore.listOrders(ownerEmail);
+    }
+
+    const normalizedOwnerEmail = this.normalizeOwnerEmail(ownerEmail);
+
+    if (!normalizedOwnerEmail) {
+      return [];
+    }
+
+    return this.orders.filter((order) => order.ownerEmail === normalizedOwnerEmail);
+  }
+
+  async listAdminOrders(statusGroup: LogisticsStatusGroup = "ALL"): Promise<LogisticsOrder[]> {
+    const orders = this.orderStore ? await this.orderStore.listAdminOrders() : this.orders;
+
     if (statusGroup === "ALL") {
-      return this.orders;
+      return orders;
     }
 
     const targetStatuses = statusGroupMap[statusGroup];
-    return this.orders.filter((order) => targetStatuses.includes(order.status));
+    return orders.filter((order) => targetStatuses.includes(order.status));
   }
 
-  getOrder(idOrTrackingNo: string): LogisticsOrder {
-    const order = this.orders.find((item) => item.id === idOrTrackingNo || item.orderNo === idOrTrackingNo || item.trackingNo === idOrTrackingNo);
+  async getOrder(idOrTrackingNo: string, ownerEmail?: string): Promise<LogisticsOrder> {
+    if (this.orderStore) {
+      return this.orderStore.getOrder(idOrTrackingNo, ownerEmail);
+    }
+
+    const normalizedOwnerEmail = this.normalizeOwnerEmail(ownerEmail);
+    const order = this.orders.find((item) => {
+      const matchesIdentifier = item.id === idOrTrackingNo || item.orderNo === idOrTrackingNo || item.trackingNo === idOrTrackingNo;
+      return matchesIdentifier && (!normalizedOwnerEmail || item.ownerEmail === normalizedOwnerEmail);
+    });
 
     if (!order) {
       throw new NotFoundException("Logistics order was not found.");
@@ -101,6 +187,7 @@ export class LogisticsService {
     const estimatedQuote = packageMeasurements.isComplete
       ? await this.buildOrderQuoteSnapshot({
           cargoType: input.cargoType,
+          deliveryMethod: input.deliveryMethod ?? "TO_DOOR",
           recipient: input.recipient,
           declaredCurrency,
           weightKg: packageMeasurements.weightKg,
@@ -110,11 +197,15 @@ export class LogisticsService {
           packageCount: packageMeasurements.packageCount
         })
       : undefined;
+    const ownerEmail = this.normalizeOwnerEmail(input.ownerEmail);
+    await this.customerRiskGuard?.assertCanCreateOrder(ownerEmail);
     const order: LogisticsOrder = {
       id,
       orderNo,
+      ...(ownerEmail ? { ownerEmail } : {}),
       cargoType: input.cargoType,
       routeId,
+      deliveryMethod: input.deliveryMethod ?? "TO_DOOR",
       status: "UNDER_REVIEW",
       reviewState: "PENDING",
       sender,
@@ -140,12 +231,21 @@ export class LogisticsService {
       createdAt: new Date().toISOString()
     };
 
+    if (this.orderStore) {
+      return this.orderStore.createOrder(order);
+    }
+
     this.persistOrders([order, ...this.orders]);
     this.orders.unshift(order);
     return order;
   }
 
-  discardOrder(orderId: string): void {
+  async discardOrder(orderId: string): Promise<void> {
+    if (this.orderStore) {
+      await this.orderStore.deleteOrder(orderId);
+      return;
+    }
+
     const index = this.orders.findIndex((order) => order.id === orderId);
 
     if (index === -1) {
@@ -158,7 +258,7 @@ export class LogisticsService {
   }
 
   async reviewOrder(orderId: string, input: ReviewOrderDto): Promise<LogisticsOrder> {
-    const order = this.getOrder(orderId);
+    const order = await this.getOrder(orderId);
     this.applyCorrections(order, input);
 
     if (input.decision === "REJECT") {
@@ -166,8 +266,7 @@ export class LogisticsService {
       order.reviewState = "REJECTED";
       order.reviewFailureReason = input.reason?.trim() || "Order review rejected by operations.";
       order.events.unshift(this.createEvent("REJECTED", "Review rejected", input.reason ?? "Order review completed with rejection.", "Operations"));
-      this.persistOrders(this.orders);
-      return order;
+      return this.saveOrder(order);
     }
 
     order.status = this.isInboundState(order.status) ? order.status : "APPROVED";
@@ -175,17 +274,15 @@ export class LogisticsService {
     delete order.reviewFailureReason;
 
     if (order.trackingNo) {
-      this.persistOrders(this.orders);
-      return order;
+      return this.saveOrder(order);
     }
 
     const releasedOrder = await this.releaseCdekOrder(order, "Automatic CDEK order release failed");
-    this.persistOrders(this.orders);
-    return releasedOrder;
+    return this.saveOrder(releasedOrder);
   }
 
   async retryTrackingNumberAssignment(orderId: string): Promise<LogisticsOrder> {
-    const order = this.getOrder(orderId);
+    const order = await this.getOrder(orderId);
 
     if (order.status === "REJECTED") {
       throw new BadRequestException("Rejected orders cannot retry carrier number assignment.");
@@ -196,12 +293,11 @@ export class LogisticsService {
     }
 
     const releasedOrder = await this.releaseCdekOrder(order, "Automatic CDEK order retry failed");
-    this.persistOrders(this.orders);
-    return releasedOrder;
+    return this.saveOrder(releasedOrder);
   }
 
-  assignManualTrackingNumber(orderId: string, input: ManualTrackingNumberDto): LogisticsOrder {
-    const order = this.getOrder(orderId);
+  async assignManualTrackingNumber(orderId: string, input: ManualTrackingNumberDto): Promise<LogisticsOrder> {
+    const order = await this.getOrder(orderId);
 
     if (order.status === "REJECTED") {
       throw new BadRequestException("Rejected orders cannot receive a tracking number.");
@@ -214,7 +310,9 @@ export class LogisticsService {
       throw new BadRequestException("Tracking number and carrier reference number are required.");
     }
 
-    if (this.orders.some((item) => item.id !== order.id && item.trackingNo === trackingNo)) {
+    const orders = this.orderStore ? await this.orderStore.listAdminOrders() : this.orders;
+
+    if (orders.some((item) => item.id !== order.id && item.trackingNo === trackingNo)) {
       throw new BadRequestException("Tracking number is already in use.");
     }
 
@@ -225,12 +323,11 @@ export class LogisticsService {
       title: "Tracking number assigned manually",
       description: "Operations manually filled the tracking number after the carrier API fallback path was used."
     });
-    this.persistOrders(this.orders);
-    return updatedOrder;
+    return this.saveOrder(updatedOrder);
   }
 
-  markInbound(orderId: string): LogisticsOrder {
-    const order = this.getOrder(orderId);
+  async markInbound(orderId: string): Promise<LogisticsOrder> {
+    const order = await this.getOrder(orderId);
 
     if (order.status !== "APPROVED" || !order.trackingNo) {
       throw new BadRequestException("Only reviewed orders with a tracking number can be marked inbound.");
@@ -238,20 +335,18 @@ export class LogisticsService {
 
     order.status = "ACCEPTED";
     order.events.unshift(this.createEvent("ACCEPTED", "Inbound completed", "Warehouse completed inbound for the reviewed order.", order.sender.city));
-    this.persistOrders(this.orders);
-    return order;
+    return this.saveOrder(order);
   }
 
-  addManualTrackingEvent(orderId: string, input: TrackingEventDto): LogisticsOrder {
-    const order = this.getOrder(orderId);
+  async addManualTrackingEvent(orderId: string, input: TrackingEventDto): Promise<LogisticsOrder> {
+    const order = await this.getOrder(orderId);
     order.status = input.status;
     order.events.unshift(this.createEvent(input.status, input.title, input.description, input.location));
-    this.persistOrders(this.orders);
-    return order;
+    return this.saveOrder(order);
   }
 
   async createLastMileOrder(orderId: string): Promise<LogisticsOrder> {
-    const order = this.getOrder(orderId);
+    const order = await this.getOrder(orderId);
 
     if (!order.trackingNo) {
       throw new BadRequestException("Create or manually assign the primary tracking number before creating a last-mile order.");
@@ -259,12 +354,11 @@ export class LogisticsService {
 
     const result = await this.carrierProvider.createLastMileOrder(order);
     order.lastMileTrackingNo = result.lastMileTrackingNo;
-    this.persistOrders(this.orders);
-    return order;
+    return this.saveOrder(order);
   }
 
   async syncLastMileTracking(orderId: string): Promise<LogisticsOrder> {
-    const order = this.getOrder(orderId);
+    const order = await this.getOrder(orderId);
     const events = await this.carrierProvider.pullTrackingEvents(order);
     order.events.unshift(...events);
     const latestStatus = events[0]?.status;
@@ -273,8 +367,7 @@ export class LogisticsService {
       order.status = latestStatus;
     }
 
-    this.persistOrders(this.orders);
-    return order;
+    return this.saveOrder(order);
   }
 
   async handshakeCdek() {
@@ -282,7 +375,7 @@ export class LogisticsService {
   }
 
   async createCdekLabel(orderId: string): Promise<LogisticsOrder> {
-    const order = this.getOrder(orderId);
+    const order = await this.getOrder(orderId);
 
     try {
       const label = await this.cdekCarrierProvider.createLabel(order);
@@ -294,13 +387,12 @@ export class LogisticsService {
     } catch (error) {
       order.labelStatus = "FAILED";
       order.labelLastError = this.getFailureReason(error, "CDEK label generation failed");
-      this.persistOrders(this.orders);
-      return order;
+      return this.saveOrder(order);
     }
   }
 
   async refreshCdekLabel(orderId: string): Promise<LogisticsOrder> {
-    const order = this.getOrder(orderId);
+    const order = await this.getOrder(orderId);
 
     if (!order.labelUuid) {
       throw new BadRequestException("Create a CDEK label before refreshing it.");
@@ -316,18 +408,16 @@ export class LogisticsService {
         delete order.labelUrl;
       }
       delete order.labelLastError;
-      this.persistOrders(this.orders);
-      return order;
+      return this.saveOrder(order);
     } catch (error) {
       order.labelStatus = "FAILED";
       order.labelLastError = this.getFailureReason(error, "CDEK label refresh failed");
-      this.persistOrders(this.orders);
-      return order;
+      return this.saveOrder(order);
     }
   }
 
   async syncCdekTracking(orderId: string): Promise<LogisticsOrder> {
-    const order = this.getOrder(orderId);
+    const order = await this.getOrder(orderId);
 
     if (!order.trackingNo) {
       throw new BadRequestException("CDEK tracking requires a carrier tracking number.");
@@ -348,13 +438,11 @@ export class LogisticsService {
         order.status = latestStatus;
       }
 
-      this.persistOrders(this.orders);
-      return order;
+      return this.saveOrder(order);
     } catch (error) {
       order.trackingSyncStatus = "FAILED";
       order.carrierLastError = this.getFailureReason(error, "CDEK tracking sync failed");
-      this.persistOrders(this.orders);
-      return order;
+      return this.saveOrder(order);
     }
   }
 
@@ -450,6 +538,10 @@ export class LogisticsService {
     return status === "ACCEPTED" || status === "TRANSFER_TO_HUB" || status === "DISPATCHED" || status === "IN_TRANSIT" || status === "ARRIVED_CUSTOMS_WAREHOUSE" || status === "CUSTOMS_CLEARANCE" || status === "CUSTOMS_RELEASED" || status === "OUT_FOR_DELIVERY" || status === "DELIVERED";
   }
 
+  private normalizeOwnerEmail(ownerEmail?: string) {
+    return ownerEmail?.trim().toLowerCase() || undefined;
+  }
+
   private normalizeCdekSenderOrigin(sender: LogisticsOrder["sender"]): LogisticsOrder["sender"] {
     return {
       ...sender,
@@ -500,6 +592,7 @@ export class LogisticsService {
 
   private async buildOrderQuoteSnapshot(input: {
     cargoType: CreateLogisticsOrderDto["cargoType"];
+    deliveryMethod: NonNullable<CreateLogisticsOrderDto["deliveryMethod"]>;
     recipient: CreateLogisticsOrderDto["recipient"];
     declaredCurrency: CurrencyCode;
     weightKg: number;
@@ -512,7 +605,7 @@ export class LogisticsService {
       cargoType: input.cargoType,
       destinationCountry: input.recipient.country as LogisticsQuoteRequest["destinationCountry"],
       destinationCity: input.recipient.city,
-      deliveryMethod: "TO_DOOR",
+      deliveryMethod: input.deliveryMethod,
       currency: input.declaredCurrency,
       weightKg: input.weightKg,
       lengthCm: input.lengthCm,
@@ -650,6 +743,15 @@ export class LogisticsService {
       order,
       this.createEvent("UNDER_REVIEW", "CDEK order submitted", "CDEK accepted the order request. Waiting for carrier number resolution.", "CDEK")
     );
+    return order;
+  }
+
+  private async saveOrder(order: LogisticsOrder): Promise<LogisticsOrder> {
+    if (this.orderStore) {
+      return this.orderStore.saveOrder(order);
+    }
+
+    this.persistOrders(this.orders);
     return order;
   }
 

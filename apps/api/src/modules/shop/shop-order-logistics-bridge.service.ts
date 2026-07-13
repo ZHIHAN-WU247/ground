@@ -5,7 +5,7 @@ import type { CreateShopLogisticsOrderDto } from "./dto/create-shop-logistics-or
 import { ShopService } from "./shop.service";
 
 type CompensatingLogisticsService = LogisticsService & {
-  discardOrder(id: string): void;
+  discardOrder(id: string): Promise<void>;
 };
 
 @Injectable()
@@ -18,10 +18,10 @@ export class ShopOrderLogisticsBridgeService {
   ) {}
 
   async submit(identifier: string, input: CreateShopLogisticsOrderDto): Promise<{
-    shopOrder: ReturnType<ShopService["getAdminOrder"]>;
+    shopOrder: Awaited<ReturnType<ShopService["getAdminOrder"]>>;
     logisticsOrder: LogisticsOrder;
   }> {
-    const shopOrder = this.shopService.getAdminOrder(identifier);
+    const shopOrder = await this.shopService.getAdminOrder(identifier);
 
     if (shopOrder.status === "LINKED_TO_LOGISTICS") {
       throw new ConflictException("Shop order is already linked to a logistics order.");
@@ -79,6 +79,7 @@ export class ShopOrderLogisticsBridgeService {
 
     try {
       const logisticsOrder = await this.logisticsService.createOrder({
+        ...(shopOrder.ownerEmail ? { ownerEmail: shopOrder.ownerEmail } : {}),
         cargoType: "B2C",
         routeId: input.routeId,
         sender: input.sender,
@@ -93,10 +94,10 @@ export class ShopOrderLogisticsBridgeService {
       });
 
       try {
-        const linkedShopOrder = this.shopService.linkOrderToLogistics(shopOrder.id, logisticsOrder);
+        const linkedShopOrder = await this.shopService.linkOrderToLogistics(shopOrder.id, logisticsOrder);
         return { shopOrder: linkedShopOrder, logisticsOrder };
       } catch (error) {
-        (this.logisticsService as CompensatingLogisticsService).discardOrder(logisticsOrder.id);
+        await (this.logisticsService as CompensatingLogisticsService).discardOrder(logisticsOrder.id);
         throw error;
       }
     } finally {

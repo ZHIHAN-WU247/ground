@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import type { LogisticsQuote } from "@ground/shared";
+import { defaultLogisticsPricingRouteConfigs, type LogisticsQuote } from "@ground/shared";
 import { buildQuoteRoutePrices } from "./quote-routes";
 
 const baseQuote: LogisticsQuote = {
@@ -43,6 +43,15 @@ const lightQuote: LogisticsQuote = { ...baseQuote, chargeableWeightKg: 0.4 };
 const lightRoutes = buildQuoteRoutePrices(lightQuote);
 assert.deepEqual(
   lightRoutes.map((route) => `${route.amount} ${route.currency}`),
+  ["185 CNY", "97.27 CNY", "69.77 CNY", "27.5 CNY"]
+);
+
+const routeConfigsWithUsdCdekCurrency = defaultLogisticsPricingRouteConfigs.map((config) =>
+  config.routeId === "air-cdek" || config.routeId === "land-cdek" ? { ...config, currency: "USD" as const } : config
+);
+const cnyRoutePrices = buildQuoteRoutePrices(lightQuote, routeConfigsWithUsdCdekCurrency);
+assert.deepEqual(
+  cnyRoutePrices.map((route) => `${route.amount} ${route.currency}`),
   ["185 CNY", "97.27 CNY", "69.77 CNY", "27.5 CNY"]
 );
 

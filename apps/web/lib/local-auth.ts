@@ -1,4 +1,5 @@
 const AUTH_ACCOUNTS_KEY = "ground.authAccounts";
+const retiredLocalAdminAccounts = new Set(["admin", "admin@ground.local", "ops", "ops@ground.local", "cdek", "cdek@ground.local"]);
 
 export interface LocalAuthAccount {
   account: string;
@@ -11,6 +12,7 @@ const isBrowser = () => typeof window !== "undefined";
 const normalizeValue = (value: string) => value.trim();
 
 const normalizeLookup = (value: string) => value.trim().toLowerCase();
+const isRetiredLocalAdminAccount = (value: string) => retiredLocalAdminAccounts.has(normalizeLookup(value));
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 
@@ -73,11 +75,15 @@ const writeLocalAuthAccounts = (accounts: LocalAuthAccount[]) => {
 export const findLocalAuthAccountByLogin = (login: string) => {
   const normalized = normalizeLookup(login);
 
-  if (!normalized) {
+  if (!normalized || isRetiredLocalAdminAccount(normalized)) {
     return null;
   }
 
   return readLocalAuthAccounts().find((account) => {
+    if (isRetiredLocalAdminAccount(account.account) || isRetiredLocalAdminAccount(account.email)) {
+      return false;
+    }
+
     return normalizeLookup(account.account) === normalized || account.email === normalized;
   }) ?? null;
 };
@@ -109,6 +115,10 @@ export const registerLocalAuthAccount = (payload: LocalAuthAccount) => {
 
   if (!account || !email || !password) {
     return { ok: false as const, reason: "invalid_payload" as const };
+  }
+
+  if (isRetiredLocalAdminAccount(account) || isRetiredLocalAdminAccount(email)) {
+    return { ok: false as const, reason: "reserved_account" as const };
   }
 
   if (hasLocalAuthAccountByAccount(account)) {

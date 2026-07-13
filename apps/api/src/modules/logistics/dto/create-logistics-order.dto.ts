@@ -1,6 +1,6 @@
 import { ArrayMinSize, IsArray, IsEmail, IsEnum, IsInt, IsNumber, IsOptional, IsPositive, IsString, ValidateNested } from "class-validator";
 import { Type } from "class-transformer";
-import type { CargoType, CurrencyCode, LogisticsRouteId } from "@ground/shared";
+import type { CargoType, CurrencyCode, LogisticsDeliveryMethod, LogisticsRouteId } from "@ground/shared";
 
 class AddressContactDto {
   @IsString()
@@ -51,12 +51,20 @@ class CargoItemDto {
 }
 
 export class CreateLogisticsOrderDto {
+  @IsOptional()
+  @IsEmail()
+  ownerEmail?: string;
+
   @IsEnum(["B2B", "B2C"])
   cargoType!: CargoType;
 
   @IsOptional()
   @IsEnum(["air-ems", "air-cdek", "land-cdek", "land-russia-post"])
   routeId?: LogisticsRouteId;
+
+  @IsOptional()
+  @IsEnum(["TO_DOOR", "TO_WAREHOUSE"])
+  deliveryMethod?: LogisticsDeliveryMethod;
 
   @ValidateNested()
   @Type(() => AddressContactDto)

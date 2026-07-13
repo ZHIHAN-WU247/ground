@@ -1,6 +1,8 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, UseGuards } from "@nestjs/common";
-import type { Product } from "@ground/shared";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import type { Product, ShopOrder } from "@ground/shared";
+import { AuditLogService } from "../audit/audit-log.service";
 import { AdminRoleGuard } from "../auth/admin-role.guard";
+import type { AuthenticatedUser } from "../auth/supabase-token.service";
 import { SupabaseTokenGuard } from "../auth/supabase-token.guard";
 import { CreateProductDto, UpdateProductStatusDto } from "./dto/create-product.dto";
 import { CreateShopLogisticsOrderDto } from "./dto/create-shop-logistics-order.dto";
@@ -8,48 +10,65 @@ import { UpdateShopOrderStatusDto } from "./dto/update-shop-order-status.dto";
 import { ShopOrderLogisticsBridgeService } from "./shop-order-logistics-bridge.service";
 import { ShopService } from "./shop.service";
 
+interface RequestWithUser {
+  user?: AuthenticatedUser;
+  ip?: string;
+  headers: {
+    "user-agent"?: string;
+  };
+}
+
 @Controller("admin/shop")
 @UseGuards(SupabaseTokenGuard, AdminRoleGuard)
 export class AdminShopController {
   constructor(
     private readonly shopService: ShopService,
-    private readonly shopOrderLogisticsBridgeService: ShopOrderLogisticsBridgeService
+    private readonly shopOrderLogisticsBridgeService: ShopOrderLogisticsBridgeService,
+    private readonly auditLogService: AuditLogService
   ) {}
 
   @Get("products")
-  listProducts(): Product[] {
+  listProducts(): Promise<Product[]> {
     return this.shopService.listAdminProducts();
   }
 
   @Get("products/:id")
-  getProduct(@Param("id") id: string): Product {
+  getProduct(@Param("id") id: string): Promise<Product> {
     return this.shopService.getAdminProduct(id);
   }
 
   @Post("products")
-  createProduct(@Body() input: CreateProductDto): Product {
-    return this.shopService.createProduct({
+  async createProduct(@Body() input: CreateProductDto, @Req() request: RequestWithUser): Promise<Product> {
+    const product = await this.shopService.createProduct({
       ...input,
       galleryImageUrls: input.galleryImageUrls ?? []
     });
+    await this.recordAudit(request, "shop.product.create", "product", product.id, this.productAuditData(product));
+    return product;
   }
 
   @Patch("products/:id")
-  updateProduct(@Param("id") id: string, @Body() input: CreateProductDto): Product {
-    return this.shopService.updateProduct(id, {
+  async updateProduct(@Param("id") id: string, @Body() input: CreateProductDto, @Req() request: RequestWithUser): Promise<Product> {
+    const product = await this.shopService.updateProduct(id, {
       ...input,
       galleryImageUrls: input.galleryImageUrls ?? []
     });
+    await this.recordAudit(request, "shop.product.update", "product", product.id, this.productAuditData(product));
+    return product;
   }
 
   @Patch("products/:id/status")
-  updateProductStatus(@Param("id") id: string, @Body() input: UpdateProductStatusDto): Product {
-    return this.shopService.setProductPublished(id, input.isPublished);
+  async updateProductStatus(@Param("id") id: string, @Body() input: UpdateProductStatusDto, @Req() request: RequestWithUser): Promise<Product> {
+    const product = await this.shopService.setProductPublished(id, input.isPublished);
+    await this.recordAudit(request, "shop.product.status.update", "product", product.id, this.productAuditData(product));
+    return product;
   }
 
   @Delete("products/:id")
-  deleteProduct(@Param("id") id: string): Product {
-    return this.shopService.deleteProduct(id);
+  async deleteProduct(@Param("id") id: string, @Req() request: RequestWithUser): Promise<Product> {
+    const product = await this.shopService.deleteProduct(id);
+    await this.recordAudit(request, "shop.product.delete", "product", product.id, this.productAuditData(product));
+    return product;
   }
 
   @Get("orders")
@@ -68,12 +87,55 @@ export class AdminShopController {
   }
 
   @Patch("orders/:id/status")
-  updateOrderStatus(@Param("id") id: string, @Body() input: UpdateShopOrderStatusDto) {
-    return this.shopService.updateOrderStatus(id, input.status);
+  async updateOrderStatus(@Param("id") id: string, @Body() input: UpdateShopOrderStatusDto, @Req() request: RequestWithUser) {
+    const order = await this.shopService.updateOrderStatus(id, input.status);
+    await this.recordAudit(request, "shop.order.status.update", "shop_order", order.id, this.shopOrderAuditData(order));
+    return order;
   }
 
   @Post("orders/:id/logistics")
-  submitOrderToLogistics(@Param("id") id: string, @Body() input: CreateShopLogisticsOrderDto) {
-    return this.shopOrderLogisticsBridgeService.submit(id, input);
+  async submitOrderToLogistics(@Param("id") id: string, @Body() input: CreateShopLogisticsOrderDto, @Req() request: RequestWithUser) {
+    const result = await this.shopOrderLogisticsBridgeService.submit(id, input);
+    await this.recordAudit(request, "shop.order.submit-logistics", "shop_order", result.shopOrder.id, {
+      ...this.shopOrderAuditData(result.shopOrder),
+      logisticsOrderId: result.logisticsOrder.id,
+      logisticsOrderNo: result.logisticsOrder.orderNo
+    });
+    return result;
+  }
+
+  private async recordAudit(request: RequestWithUser, action: string, entityType: string, entityId: string, afterData: Record<string, unknown>) {
+    await this.auditLogService.recordLog({
+      ...(request.user?.id ? { actorUserId: request.user.id } : {}),
+      ...(request.user?.email ? { actorEmail: request.user.email } : {}),
+      action,
+      entityType,
+      entityId,
+      beforeData: null,
+      afterData,
+      ...(request.ip ? { ipAddress: request.ip } : {}),
+      ...(request.headers["user-agent"] ? { userAgent: request.headers["user-agent"] } : {})
+    });
+  }
+
+  private productAuditData(product: Product) {
+    return {
+      id: product.id,
+      slug: product.slug,
+      name: product.name,
+      categorySlug: product.categorySlug,
+      isPublished: product.isPublished
+    };
+  }
+
+  private shopOrderAuditData(order: ShopOrder) {
+    return {
+      id: order.id,
+      orderNo: order.orderNo,
+      status: order.status,
+      ownerEmail: order.ownerEmail ?? null,
+      totalAmount: order.totalAmount,
+      currency: order.currency
+    };
   }
 }

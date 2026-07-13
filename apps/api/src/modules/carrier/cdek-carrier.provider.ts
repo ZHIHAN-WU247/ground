@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { BadRequestException, Injectable, ServiceUnavailableException } from "@nestjs/common";
+import { BadRequestException, Injectable, Optional, ServiceUnavailableException } from "@nestjs/common";
 import type { CarrierLabelStatus, CurrencyCode, LogisticsOrder, LogisticsQuote, LogisticsQuoteRequest, LogisticsStatus, TrackingEvent } from "@ground/shared";
+import { CarrierConfigService } from "./carrier-config.service";
 
 interface CdekToken {
   accessToken: string;
@@ -61,6 +62,19 @@ interface CdekCityMatch {
   postal_code?: string;
 }
 
+interface CdekDeliveryPoint {
+  code?: string;
+  location?: {
+    postal_code?: string;
+  };
+}
+
+interface CdekOrderPayloadOptions {
+  tariffCode?: number;
+  shipmentPointCode?: string;
+  deliveryPointCode?: string;
+}
+
 const cdekStatusMap: Record<string, LogisticsStatus> = {
   CREATED: "APPROVED",
   ACCEPTED_FOR_DELIVERY: "ACCEPTED",
@@ -98,6 +112,8 @@ const cdekMoscowOrigin: Required<Pick<CdekLocationAddress, "country" | "province
 export class CdekCarrierProvider {
   private token: CdekToken | null = null;
   private trackingToken: string | null = null;
+
+  constructor(@Optional() private readonly carrierConfigService?: CarrierConfigService) {}
 
   async handshake(): Promise<CdekHandshakeResult> {
     const token = await this.getToken();
@@ -142,10 +158,16 @@ export class CdekCarrierProvider {
 
   async createOrder(order: LogisticsOrder): Promise<CdekCreateOrderResult> {
     this.assertProductionWritesEnabled();
+    const tariffCode = this.resolveOrderTariffCode(order);
+    const sender = this.normalizeSenderOrigin(order.sender);
+    const pointCodes = await this.resolveOrderPointCodes(order, sender, tariffCode);
 
     const response = await this.cdekFetch<Record<string, unknown>>("/v2/orders", {
       method: "POST",
-      body: this.buildOrderPayload(order)
+      body: this.buildOrderPayload(order, {
+        tariffCode,
+        ...pointCodes
+      })
     });
     const entity = this.getRecord(response.entity);
     const requests = Array.isArray(response.requests) ? response.requests : [];
@@ -308,7 +330,7 @@ export class CdekCarrierProvider {
 
   private async cdekFetch<T>(path: string, options: { method: "GET" | "POST"; body?: unknown }): Promise<T> {
     const token = await this.getToken();
-    return this.fetchJson<T>(`${this.getApiBaseUrl()}${path}`, {
+    return this.fetchJson<T>(`${await this.getApiBaseUrl()}${path}`, {
       method: options.method,
       headers: {
         Accept: "application/json",
@@ -336,7 +358,7 @@ export class CdekCarrierProvider {
       client_id: clientId,
       client_secret: clientSecret
     });
-    const response = await this.fetchJson<Record<string, unknown>>(`${this.getApiBaseUrl()}/v2/oauth/token?parameters`, {
+    const response = await this.fetchJson<Record<string, unknown>>(`${await this.getApiBaseUrl()}/v2/oauth/token?parameters`, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded"
@@ -402,12 +424,36 @@ export class CdekCarrierProvider {
     return (text ? JSON.parse(text) : {}) as T;
   }
 
-  private buildOrderPayload(order: LogisticsOrder) {
+  private buildOrderPayload(order: LogisticsOrder, options: CdekOrderPayloadOptions = {}) {
     const packageWeightGrams = Math.max(1, Math.round(order.weightKg * 1000));
-    const tariffCode = order.cdekTariffCode ?? cdekDefaultTariffCode;
+    const tariffCode = options.tariffCode ?? this.resolveOrderTariffCode(order);
     const today = new Date().toISOString().slice(0, 10);
     const sender = this.normalizeSenderOrigin(order.sender);
     const items = this.buildOrderItems(order, packageWeightGrams, sender.country);
+    const shipmentLocation = options.shipmentPointCode
+      ? { shipment_point: options.shipmentPointCode }
+      : {
+          from_location: {
+            country_code: this.mapCountryCode(sender.country),
+            region: sender.province,
+            city: sender.city,
+            postal_code: sender.postalCode,
+            address: sender.addressLine,
+            ...(this.buildLocationIdentifier(sender) ?? {})
+          }
+        };
+    const recipientLocation = options.deliveryPointCode
+      ? { delivery_point: options.deliveryPointCode }
+      : {
+          to_location: {
+            country_code: this.mapCountryCode(order.recipient.country),
+            region: order.recipient.province,
+            city: order.recipient.city,
+            postal_code: order.recipient.postalCode,
+            address: order.recipient.addressLine,
+            ...(this.buildLocationIdentifier(order.recipient) ?? {})
+          }
+        };
 
     return {
       type: 1,
@@ -422,22 +468,8 @@ export class CdekCarrierProvider {
         email: order.recipient.email,
         phones: [{ number: order.recipient.phone }]
       },
-      from_location: {
-        country_code: this.mapCountryCode(sender.country),
-        region: sender.province,
-        city: sender.city,
-        postal_code: sender.postalCode,
-        address: sender.addressLine,
-        ...(this.buildLocationIdentifier(sender) ?? {})
-      },
-      to_location: {
-        country_code: this.mapCountryCode(order.recipient.country),
-        region: order.recipient.province,
-        city: order.recipient.city,
-        postal_code: order.recipient.postalCode,
-        address: order.recipient.addressLine,
-        ...(this.buildLocationIdentifier(order.recipient) ?? {})
-      },
+      ...shipmentLocation,
+      ...recipientLocation,
       packages: [
         {
           number: `${order.orderNo}-1`,
@@ -609,6 +641,125 @@ export class CdekCarrierProvider {
     return input.deliveryMethod === "TO_WAREHOUSE" ? cdekWarehouseToWarehouseTariffCode : cdekWarehouseToDoorTariffCode;
   }
 
+  private resolveOrderTariffCode(order: LogisticsOrder) {
+    if (order.cdekTariffCode !== undefined) {
+      return order.cdekTariffCode;
+    }
+
+    if (order.cargoType !== "B2C") {
+      return cdekDefaultTariffCode;
+    }
+
+    return order.deliveryMethod === "TO_WAREHOUSE" ? cdekWarehouseToWarehouseTariffCode : cdekWarehouseToDoorTariffCode;
+  }
+
+  private async resolveOrderPointCodes(order: LogisticsOrder, sender: CdekLocationAddress, tariffCode: number): Promise<Pick<CdekOrderPayloadOptions, "shipmentPointCode" | "deliveryPointCode">> {
+    if (tariffCode !== cdekWarehouseToWarehouseTariffCode) {
+      return {};
+    }
+
+    const [shipmentPointCode, deliveryPointCode] = await Promise.all([
+      this.resolveDeliveryPointCode(sender, "sender"),
+      this.resolveDeliveryPointCode(order.recipient, "recipient")
+    ]);
+
+    return {
+      shipmentPointCode,
+      deliveryPointCode
+    };
+  }
+
+  private async resolveDeliveryPointCode(address: CdekLocationAddress, role: "sender" | "recipient") {
+    const explicitCode = this.getExplicitDeliveryPointCode(address);
+
+    if (explicitCode) {
+      return explicitCode;
+    }
+
+    const cityCode = await this.resolveAddressCityCode(address, role);
+    const deliveryPoints = await this.findCdekDeliveryPoints(cityCode);
+    const selectedPoint = this.selectDeliveryPoint(address, deliveryPoints);
+    const pointCode = this.getString(selectedPoint?.code);
+
+    if (!pointCode) {
+      throw new BadRequestException(`CDEK could not find a ${role} pickup point for ${address.city}.`);
+    }
+
+    return pointCode;
+  }
+
+  private getExplicitDeliveryPointCode(address: CdekLocationAddress) {
+    const record = address as CdekLocationAddress & {
+      deliveryPointCode?: unknown;
+      cdekDeliveryPointCode?: unknown;
+    };
+
+    return this.getString(record.deliveryPointCode) ?? this.getString(record.cdekDeliveryPointCode);
+  }
+
+  private async resolveAddressCityCode(address: CdekLocationAddress, role: "sender" | "recipient") {
+    const locationCode = this.normalizeLocationCode(address.locationCode);
+
+    if (typeof locationCode === "number") {
+      return String(locationCode);
+    }
+
+    const countryCode = this.mapCountryCode(address.country);
+    const postalCode = this.getString(address.postalCode);
+
+    if (postalCode) {
+      const postalMatches = await this.findCdekCities({
+        countryCode,
+        postalCode,
+        size: 5
+      });
+      const postalMatch = this.selectCityMatch(address.city, postalMatches);
+
+      if (postalMatch?.code !== undefined) {
+        return String(postalMatch.code);
+      }
+    }
+
+    const cityMatches = await this.findCdekCities({
+      countryCode,
+      city: address.city,
+      size: 5
+    });
+    const cityMatch = this.selectCityMatch(address.city, cityMatches);
+
+    if (cityMatch?.code !== undefined) {
+      return String(cityMatch.code);
+    }
+
+    throw new BadRequestException(`CDEK could not identify ${role} city ${address.city} before selecting a pickup point.`);
+  }
+
+  private async findCdekDeliveryPoints(cityCode: string) {
+    const params = new URLSearchParams({
+      city_code: cityCode,
+      type: "PVZ"
+    });
+
+    return this.cdekFetch<CdekDeliveryPoint[]>(`/v2/deliverypoints?${params.toString()}`, {
+      method: "GET"
+    });
+  }
+
+  private selectDeliveryPoint(address: CdekLocationAddress, deliveryPoints: CdekDeliveryPoint[]) {
+    const candidates = deliveryPoints.filter((point) => this.getString(point.code));
+    const postalCode = this.getString(address.postalCode);
+
+    if (postalCode) {
+      const postalMatch = candidates.find((point) => this.getString(point.location?.postal_code) === postalCode);
+
+      if (postalMatch) {
+        return postalMatch;
+      }
+    }
+
+    return candidates[0];
+  }
+
   private async resolvePendingOrderNumber(initialResult: CdekCreateOrderResult): Promise<CdekCreateOrderResult> {
     if (initialResult.cdekNumber || !this.isPendingOrderState(initialResult.state)) {
       return initialResult;
@@ -681,8 +832,14 @@ export class CdekCarrierProvider {
     }
   }
 
-  private getApiBaseUrl() {
-    return process.env.CDEK_API_BASE_URL || "https://api.cdek.ru";
+  private async getApiBaseUrl() {
+    const config = await this.carrierConfigService?.getConfig("cdek");
+
+    if (config && !config.isActive) {
+      throw new ServiceUnavailableException("CDEK carrier is disabled in carrier config.");
+    }
+
+    return process.env.CDEK_API_BASE_URL || config?.apiBaseUrl || "https://api.cdek.ru";
   }
 
   private mapCountryCode(country: string) {

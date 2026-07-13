@@ -5,6 +5,8 @@ import { useI18n } from "../../../components/I18nProvider";
 import { getSafeAuthReturnPath } from "../../../lib/auth-redirect";
 import { hasLocalAuthAccountByAccount, hasLocalAuthAccountByEmail, registerLocalAuthAccount } from "../../../lib/local-auth";
 import { saveLocalUserProfile } from "../../../lib/local-user-profile";
+import { signUpWithSupabasePassword } from "../../../lib/supabase-auth";
+import { savePersistentUserProfile } from "../../../lib/user-profile-api";
 
 const initialState = {
   account: "",
@@ -176,6 +178,8 @@ export function RegisterForm() {
         return;
       }
 
+      await signUpWithSupabasePassword(form.email, form.password, form.account);
+
       const registerResult = registerLocalAuthAccount({
         account: form.account,
         email: form.email,
@@ -188,7 +192,7 @@ export function RegisterForm() {
         return;
       }
 
-      saveLocalUserProfile({
+      const initialProfile = {
         name: form.account,
         email: form.email,
         phone: "",
@@ -197,7 +201,10 @@ export function RegisterForm() {
         city: "",
         postalCode: "",
         addressLine: ""
-      });
+      };
+
+      saveLocalUserProfile(initialProfile);
+      await savePersistentUserProfile(initialProfile);
 
       showMessage("success", copy.success);
       window.location.assign(getSafeAuthReturnPath(window.location.search));

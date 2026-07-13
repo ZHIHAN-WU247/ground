@@ -1,4 +1,4 @@
-import type { CurrencyCode, LogisticsQuote, LogisticsRouteId } from "@ground/shared";
+import { defaultLogisticsPricingRouteConfigs, type CurrencyCode, type LogisticsPricingRouteConfig, type LogisticsQuote, type LogisticsRouteId } from "@ground/shared";
 
 export type QuoteRoutePriceId = LogisticsRouteId;
 
@@ -17,67 +17,59 @@ export interface QuoteRoutePrice {
 }
 
 export const quoteRouteOptions: QuoteRouteOption[] = [
-  {
-    id: "air-ems",
-    labelKey: "quote.route.airEms",
-    noteKey: "quote.route.airEms.note"
-  },
-  {
-    id: "air-cdek",
-    labelKey: "quote.route.airCdek",
-    noteKey: "quote.route.airCdek.note"
-  },
-  {
-    id: "land-cdek",
-    labelKey: "quote.route.landCdek",
-    noteKey: "quote.route.landCdek.note"
-  },
-  {
-    id: "land-russia-post",
-    labelKey: "quote.route.landRussiaPost",
-    noteKey: "quote.route.landRussiaPost.note"
-  }
+  ...defaultLogisticsPricingRouteConfigs.map((config) => ({
+    id: config.routeId,
+    labelKey: config.labelKey,
+    noteKey: config.noteKey
+  }))
 ];
 
-const halfKgUnit = 0.5;
-const rubPerCny = 11;
-const airCdekFirstMileCnyPerKg = 90;
-const landCdekFirstMileCnyPerKg = 35;
-
-export function buildQuoteRoutePrices(quote: Pick<LogisticsQuote, "cargoType" | "currency" | "totalAmount" | "amount" | "chargeableWeightKg">): QuoteRoutePrice[] {
+export function buildQuoteRoutePrices(
+  quote: Pick<LogisticsQuote, "cargoType" | "currency" | "totalAmount" | "amount" | "chargeableWeightKg">,
+  configs: LogisticsPricingRouteConfig[] = defaultLogisticsPricingRouteConfigs
+): QuoteRoutePrice[] {
   if (quote.cargoType !== "B2C") {
     return [];
   }
 
   const cdekLastMileAmount = quote.totalAmount ?? quote.amount;
-  const cdekLastMileCny = convertToCny(cdekLastMileAmount, quote.currency);
+  const activeConfigs = configs
+    .filter((config) => config.cargoType === "B2C" && config.isActive)
+    .sort((current, next) => current.sortOrder - next.sortOrder);
 
-  const routeAmounts: Record<LogisticsRouteId, { amount: number; currency: CurrencyCode }> = {
-    "air-ems": {
-      amount: calculateAirEmsAmount(quote.chargeableWeightKg),
-      currency: "CNY"
-    },
-    "air-cdek": {
-      amount: calculateCdekRouteAmount(quote.chargeableWeightKg, airCdekFirstMileCnyPerKg, cdekLastMileCny),
-      currency: "CNY"
-    },
-    "land-cdek": {
-      amount: calculateCdekRouteAmount(quote.chargeableWeightKg, landCdekFirstMileCnyPerKg, cdekLastMileCny),
-      currency: "CNY"
-    },
-    "land-russia-post": {
-      amount: calculateLandRussiaPostAmount(quote.chargeableWeightKg),
-      currency: "CNY"
-    }
-  };
+  const routeCurrency: CurrencyCode = "CNY";
 
-  return quoteRouteOptions.map((route) => ({
-    ...route,
-    ...routeAmounts[route.id]
+  return activeConfigs.map((config) => ({
+    id: config.routeId,
+    labelKey: config.labelKey,
+    noteKey: config.noteKey,
+    amount: calculateRouteAmount(config, quote.chargeableWeightKg, cdekLastMileAmount, quote.currency),
+    currency: routeCurrency
   }));
 }
 
-function convertToCny(amount: number, currency: CurrencyCode) {
+export function selectQuoteRoutePrice(
+  quote: Pick<LogisticsQuote, "cargoType" | "currency" | "totalAmount" | "amount" | "chargeableWeightKg">,
+  routeId: LogisticsRouteId,
+  configs: LogisticsPricingRouteConfig[] = defaultLogisticsPricingRouteConfigs
+) {
+  return buildQuoteRoutePrices(quote, configs).find((route) => route.id === routeId);
+}
+
+function calculateRouteAmount(config: LogisticsPricingRouteConfig, weightKg: number, lastMileAmount: number, lastMileCurrency: CurrencyCode) {
+  if (config.formula === "half_kg_step") {
+    return calculateHalfKgStepAmount(weightKg, config);
+  }
+
+  if (config.formula === "cdek_first_last_mile") {
+    const cdekLastMileCny = convertToCny(lastMileAmount, lastMileCurrency, config.rubPerCny ?? 11);
+    return calculateCdekRouteAmount(weightKg, config.firstMileCnyPerKg ?? 0, config.halfKgUnit, cdekLastMileCny);
+  }
+
+  return calculatePerKgAmount(weightKg, config);
+}
+
+function convertToCny(amount: number, currency: CurrencyCode, rubPerCny: number) {
   if (currency === "RUB") {
     return amount / rubPerCny;
   }
@@ -85,26 +77,26 @@ function convertToCny(amount: number, currency: CurrencyCode) {
   return amount;
 }
 
-function calculateCdekRouteAmount(weightKg: number, firstMileCnyPerKg: number, lastMileCny: number) {
-  const firstMileBillableWeightKg = getBillableHalfKgUnits(weightKg) * halfKgUnit;
+function calculateCdekRouteAmount(weightKg: number, firstMileCnyPerKg: number, halfKgUnit: number, lastMileCny: number) {
+  const firstMileBillableWeightKg = getBillableHalfKgUnits(weightKg, halfKgUnit) * halfKgUnit;
 
   return roundMoney(firstMileBillableWeightKg * firstMileCnyPerKg + lastMileCny);
 }
 
-function getBillableHalfKgUnits(weightKg: number) {
+function getBillableHalfKgUnits(weightKg: number, halfKgUnit: number) {
   return Math.max(1, Math.ceil(weightKg / halfKgUnit));
 }
 
-function calculateAirEmsAmount(weightKg: number) {
-  const units = getBillableHalfKgUnits(weightKg);
+function calculateHalfKgStepAmount(weightKg: number, config: LogisticsPricingRouteConfig) {
+  const units = getBillableHalfKgUnits(weightKg, config.halfKgUnit);
 
-  return 185 + (units - 1) * 55;
+  return roundMoney((config.baseAmount ?? 0) + (units - 1) * (config.stepAmount ?? 0));
 }
 
-function calculateLandRussiaPostAmount(weightKg: number) {
-  const billableWeightKg = getBillableHalfKgUnits(weightKg) * halfKgUnit;
+function calculatePerKgAmount(weightKg: number, config: LogisticsPricingRouteConfig) {
+  const billableWeightKg = getBillableHalfKgUnits(weightKg, config.halfKgUnit) * config.halfKgUnit;
 
-  return roundMoney(billableWeightKg * 55);
+  return roundMoney(billableWeightKg * (config.perKgAmount ?? 0));
 }
 
 function roundMoney(amount: number) {

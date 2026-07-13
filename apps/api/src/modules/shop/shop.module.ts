@@ -1,5 +1,7 @@
 import { Module } from "@nestjs/common";
+import { AuditLogModule } from "../audit/audit-log.module";
 import { AuthModule } from "../auth/auth.module";
+import { DatabaseModule } from "../database/database.module";
 import { LogisticsModule } from "../logistics/logistics.module";
 import { AdminShopController } from "./admin-shop.controller";
 import { ShopController } from "./shop.controller";
@@ -7,7 +9,7 @@ import { ShopOrderLogisticsBridgeService } from "./shop-order-logistics-bridge.s
 import { ShopService } from "./shop.service";
 
 @Module({
-  imports: [AuthModule, LogisticsModule],
+  imports: [AuditLogModule, AuthModule, DatabaseModule, LogisticsModule],
   controllers: [ShopController, AdminShopController],
   providers: [ShopService, ShopOrderLogisticsBridgeService],
   exports: [ShopService]

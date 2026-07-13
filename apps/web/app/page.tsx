@@ -1,16 +1,21 @@
 import Link from "next/link";
 import { ShoppingBag, Truck } from "lucide-react";
+import { listActiveContentBanners } from "../lib/content-banners-api";
 
 const logisticsTags = ["物流报价", "订单管理", "实时追踪"];
 const shopTags = ["精选好物", "全球直邮", "品质保障"];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const [banner] = await listActiveContentBanners("home");
+  const heroTitle = banner?.title ?? "连接世界，";
+  const heroSubtitle = banner?.subtitle ?? "触手可及";
+
   return (
     <section className="shell home-hero-page">
       <div className="home-hero-copy">
         <h1 className="home-hero-title">
-          <span>连接世界，</span>
-          <span className="home-hero-title-accent">触手可及</span>
+          <span>{heroTitle}</span>
+          <span className="home-hero-title-accent">{heroSubtitle}</span>
         </h1>
       </div>
 
@@ -23,6 +28,11 @@ export default function HomePage() {
           <ShoppingBag aria-hidden="true" />
           <span>Ground商城</span>
         </Link>
+        {banner?.href ? (
+          <Link className="home-hero-cta" href={banner.href}>
+            <span>View campaign</span>
+          </Link>
+        ) : null}
       </div>
 
       <div className="home-feature-grid">

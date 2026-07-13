@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import type { CargoType, CurrencyCode, LogisticsDeliveryMethod, LogisticsQuote, SupportedDestinationCountry } from "@ground/shared";
+import { useEffect, useState } from "react";
+import { defaultLogisticsPricingRouteConfigs, defaultLogisticsRegionConfigs, type CargoType, type CurrencyCode, type LogisticsDeliveryMethod, type LogisticsPricingRouteConfig, type LogisticsQuote, type LogisticsRegionCountryConfig, type SupportedDestinationCountry } from "@ground/shared";
 import { useI18n } from "../../../components/I18nProvider";
 import { postJson } from "../../../lib/api";
+import { listPricingRouteConfigs } from "../../../lib/logistics-pricing-api";
+import { listLogisticsRegions } from "../../../lib/logistics-regions-api";
 import { buildQuoteRoutePrices } from "./quote-routes";
 
 interface QuoteFormState {
@@ -22,7 +24,6 @@ interface QuoteFormState {
   packageCount: string;
 }
 
-const countryOptions: SupportedDestinationCountry[] = ["Russia"];
 const deliveryMethodOptions: LogisticsDeliveryMethod[] = ["TO_DOOR", "TO_WAREHOUSE"];
 
 const initialState: QuoteFormState = {
@@ -46,8 +47,17 @@ export function QuoteForm() {
   const [quote, setQuote] = useState<LogisticsQuote | null>(null);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const routePrices = quote ? buildQuoteRoutePrices(quote) : [];
+  const [routeConfigs, setRouteConfigs] = useState<LogisticsPricingRouteConfig[]>(defaultLogisticsPricingRouteConfigs);
+  const [regions, setRegions] = useState<LogisticsRegionCountryConfig[]>(defaultLogisticsRegionConfigs);
+  const routePrices = quote ? buildQuoteRoutePrices(quote, routeConfigs) : [];
   const isCEndQuote = quote?.cargoType === "B2C";
+  const countryOptions = getDestinationCountryOptions(regions);
+  const cityOptions = regions.find((country) => country.name === form.destinationCountry)?.cities.filter((city) => city.isActive) ?? [];
+
+  useEffect(() => {
+    void listPricingRouteConfigs().then(setRouteConfigs);
+    void listLogisticsRegions().then(setRegions);
+  }, []);
 
   const updateField = <K extends keyof QuoteFormState>(field: K, value: QuoteFormState[K]) => {
     setForm((current) => ({ ...current, [field]: value }));
@@ -110,7 +120,10 @@ export function QuoteForm() {
           </div>
           <div className="field">
             <label htmlFor="destinationCity">{t("quote.label.destinationCity")}</label>
-            <input id="destinationCity" value={form.destinationCity} onChange={(event) => updateField("destinationCity", event.target.value)} required />
+            <input id="destinationCity" list="quoteDestinationCities" value={form.destinationCity} onChange={(event) => updateField("destinationCity", event.target.value)} required />
+            <datalist id="quoteDestinationCities">
+              {cityOptions.map((city) => <option key={city.id} value={city.name} />)}
+            </datalist>
             <small className="field-hint">{t("quote.hint.destinationCity")}</small>
           </div>
           <div className="field">
@@ -201,7 +214,10 @@ export function QuoteForm() {
             <p>{t("quote.result.actualVolumetric", { actual: quote.actualWeightKg, volumetric: quote.volumetricWeightKg })}</p>
             {!isCEndQuote && quote.exchangeRateNote ? <p className="soft">{quote.exchangeRateNote}</p> : null}
             <div className="button-row">
-              <Link className="button primary" href="/logistics/orders/new">
+              <Link
+                className="button primary"
+                href={`/logistics/orders/new?deliveryMethod=${quote.deliveryMethod}&weightKg=${form.weightKg}&lengthCm=${form.lengthCm}&widthCm=${form.widthCm}&heightCm=${form.heightCm}`}
+              >
                 {t("quote.result.createOrder")}
               </Link>
             </div>
@@ -212,4 +228,13 @@ export function QuoteForm() {
       </div>
     </div>
   );
+}
+
+function getDestinationCountryOptions(regions: LogisticsRegionCountryConfig[]): SupportedDestinationCountry[] {
+  const values = regions
+    .filter((country) => country.isActive && country.name !== "China")
+    .map((country) => country.name)
+    .filter((name): name is SupportedDestinationCountry => name === "Russia" || name === "Kazakhstan" || name === "Belarus");
+
+  return values.length > 0 ? values : ["Russia"];
 }

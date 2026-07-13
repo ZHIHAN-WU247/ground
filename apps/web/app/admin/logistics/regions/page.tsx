@@ -1,5 +1,11 @@
-import { PageHero } from "../../../../components/PageHero";
+import { AdminRegionsClient } from "./AdminRegionsClient";
 
 export default function AdminRegionsPage() {
-  return <PageHero eyebrowKey="admin.logistics.regions.eyebrow" titleKey="admin.logistics.regions.title" descriptionKey="admin.logistics.regions.description" />;
+  return (
+    <main className="admin-regions-page">
+      <section className="shell">
+        <AdminRegionsClient />
+      </section>
+    </main>
+  );
 }

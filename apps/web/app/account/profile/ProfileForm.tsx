@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useI18n } from "../../../components/I18nProvider";
 import { getActiveLocalUserProfile, saveLocalUserProfile, type LocalUserProfile } from "../../../lib/local-user-profile";
+import { findPersistentUserProfileByEmail, savePersistentUserProfile } from "../../../lib/user-profile-api";
 
 const emptyProfile: LocalUserProfile = {
   name: "",
@@ -25,6 +26,13 @@ export function ProfileForm() {
 
     if (storedProfile) {
       setProfile(storedProfile);
+      if (storedProfile.email) {
+        void findPersistentUserProfileByEmail(storedProfile.email).then((remoteProfile) => {
+          if (remoteProfile) {
+            setProfile(remoteProfile);
+          }
+        });
+      }
     }
   }, []);
 
@@ -32,9 +40,9 @@ export function ProfileForm() {
     setProfile((current) => ({ ...current, [field]: value }));
   };
 
-  const saveProfile = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveProfile = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    const savedProfile = saveLocalUserProfile(profile);
+    const savedProfile = await savePersistentUserProfile(profile);
     setProfile(savedProfile ?? profile);
     setMessage(t("account.profile.saved"));
   };

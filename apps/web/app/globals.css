@@ -744,6 +744,28 @@ body:has(.logistics-home) {
   box-shadow: 0 20px 54px rgba(32, 37, 48, 0.08);
 }
 
+.order-create-page .empty-state {
+  border-color: #e1e4ea;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 18px 46px rgba(32, 37, 48, 0.06);
+}
+
+.order-create-page .order-confirmation {
+  position: relative;
+  overflow: hidden;
+}
+
+.order-create-page .order-confirmation::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #ef3b49, #6d5ce7);
+  content: "";
+}
+
 .order-create-page .eyebrow {
   color: #ef3b49;
 }
@@ -785,6 +807,26 @@ body:has(.logistics-home) {
 .order-create-page .button.primary:hover,
 .order-create-page .button.primary:focus-visible {
   background: #d92c3b;
+}
+
+.order-create-page .button:not(.primary) {
+  border-color: #e1e4ea;
+  background: #f4f5f8;
+  color: #202530;
+  font-weight: 750;
+}
+
+.order-create-page .button:not(.primary):hover,
+.order-create-page .button:not(.primary):focus-visible {
+  border-color: rgba(239, 59, 73, 0.38);
+  background: rgba(239, 59, 73, 0.08);
+  outline: none;
+  color: #d92c3b;
+}
+
+.order-create-page .status.success {
+  background: rgba(239, 59, 73, 0.1);
+  color: #d92c3b;
 }
 
 .tracking-page {
@@ -849,6 +891,120 @@ body:has(.logistics-home) {
   background: #d92c3b;
 }
 
+.order-detail-page {
+  --brand: #ef3b49;
+  --brand-dark: #d92c3b;
+  --border: #e1e4ea;
+  --surface-muted: #f4f5f8;
+  position: relative;
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 85% 8%, rgba(239, 59, 73, 0.075), transparent 22rem),
+    radial-gradient(circle at 8% 76%, rgba(109, 92, 231, 0.045), transparent 24rem),
+    #f7f8fb;
+  font-family: "Avenir Next", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif;
+}
+
+.order-detail-page::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(113, 121, 136, 0.13) 0.7px, transparent 0.8px);
+  background-size: 28px 28px;
+  content: "";
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.order-detail-content {
+  position: relative;
+  z-index: 1;
+  padding-top: clamp(56px, 10vh, 104px);
+  padding-bottom: 112px;
+}
+
+.order-detail-grid {
+  align-items: start;
+}
+
+.order-detail-page .panel,
+.order-detail-page .empty-state {
+  border-color: #e1e4ea;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 64px rgba(32, 37, 48, 0.1);
+}
+
+.order-summary-card {
+  position: relative;
+  overflow: hidden;
+}
+
+.order-summary-card::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #ef3b49, #6d5ce7);
+  content: "";
+}
+
+.order-summary-card h3 {
+  font-size: clamp(1.45rem, 2.1vw, 1.9rem);
+}
+
+.order-summary-card p {
+  color: #4f5868;
+  line-height: 1.65;
+}
+
+.order-detail-page .button:not(.primary) {
+  border-color: #e1e4ea;
+  background: #f4f5f8;
+  color: #202530;
+  font-weight: 750;
+}
+
+.order-detail-page .button:not(.primary):hover,
+.order-detail-page .button:not(.primary):focus-visible {
+  border-color: rgba(239, 59, 73, 0.38);
+  background: rgba(239, 59, 73, 0.08);
+  outline: none;
+  color: #d92c3b;
+}
+
+.order-detail-page .status {
+  background: rgba(239, 59, 73, 0.08);
+  color: #d92c3b;
+}
+
+.order-detail-page .status.success {
+  background: rgba(239, 59, 73, 0.1);
+  color: #d92c3b;
+}
+
+.order-detail-page .timeline li:not(:last-child)::before {
+  background: #e1e4ea;
+}
+
+.order-detail-page .timeline-dot {
+  background: #ef3b49;
+  box-shadow: 0 0 0 6px rgba(239, 59, 73, 0.12);
+}
+
+.order-detail-page .timeline-content {
+  border-bottom-color: #e1e4ea;
+}
+
+.order-detail-page .timeline-content h3 {
+  color: #111111;
+}
+
+.order-detail-page .timeline-content p {
+  color: #4f5868;
+}
+
 .account-themed-page {
   --brand: #ef3b49;
   --brand-dark: #d92c3b;
@@ -889,10 +1045,7 @@ body:has(.logistics-home) {
   font-weight: 700;
 }
 
-.account-profile-page .account-nav .button:first-child,
-.account-senders-page .account-nav .button:nth-child(2),
-.account-recipients-page .account-nav .button:nth-child(3),
-.account-documents-page .account-nav .button:nth-child(4) {
+.account-themed-page .account-nav .button.active {
   border-color: #ef3b49;
   background: #ef3b49;
   color: #ffffff;
@@ -1807,6 +1960,89 @@ textarea {
 
 .shop-home .shop-product-category {
   background: rgba(239, 59, 73, 0.1);
+}
+
+.shop-orders-page {
+  --brand: #ef3b49;
+  --brand-dark: #d92c3b;
+  --border: #e1e4ea;
+  --surface-muted: #f4f5f8;
+  position: relative;
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 10%, rgba(239, 59, 73, 0.075), transparent 22rem),
+    radial-gradient(circle at 10% 74%, rgba(109, 92, 231, 0.045), transparent 24rem),
+    #f7f8fb;
+  font-family: "Avenir Next", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif;
+}
+
+.shop-orders-page::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(113, 121, 136, 0.13) 0.7px, transparent 0.8px);
+  background-size: 28px 28px;
+  content: "";
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.shop-orders-section {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  min-height: calc(100vh - 77px);
+  align-items: start;
+  padding-top: clamp(84px, 15vh, 150px);
+  padding-bottom: 120px;
+}
+
+.shop-orders-panel {
+  position: relative;
+  overflow: hidden;
+  border-color: #e1e4ea;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 64px rgba(32, 37, 48, 0.1);
+}
+
+.shop-orders-panel::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #ef3b49, #6d5ce7);
+  content: "";
+}
+
+.shop-orders-panel .table th {
+  color: #707888;
+}
+
+.shop-orders-panel .table td {
+  font-size: 1.02rem;
+}
+
+.shop-orders-panel .status {
+  border-color: rgba(239, 59, 73, 0.18);
+  background: rgba(239, 59, 73, 0.08);
+  color: #d92c3b;
+}
+
+.shop-orders-panel .button:not(.primary) {
+  border-color: #e1e4ea;
+  background: #f4f5f8;
+  color: #202530;
+  font-weight: 750;
+}
+
+.shop-orders-panel .button:not(.primary):hover,
+.shop-orders-panel .button:not(.primary):focus-visible {
+  border-color: rgba(239, 59, 73, 0.38);
+  background: rgba(239, 59, 73, 0.08);
+  outline: none;
+  color: #d92c3b;
 }
 
 .shop-toolbar {
@@ -3321,6 +3557,148 @@ textarea {
 .admin-logistics-workspace {
   display: grid;
   gap: 20px;
+}
+
+.admin-logistics-orders-page {
+  --brand: #ef3b49;
+  --brand-dark: #d92c3b;
+  --border: #e1e4ea;
+  --surface-muted: #f4f5f8;
+  position: relative;
+  min-height: calc(100vh - 77px);
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 84% 10%, rgba(239, 59, 73, 0.075), transparent 22rem),
+    radial-gradient(circle at 10% 74%, rgba(109, 92, 231, 0.045), transparent 24rem),
+    #f7f8fb;
+  font-family: "Avenir Next", "Noto Sans SC", "Source Han Sans SC", "PingFang SC", sans-serif;
+}
+
+.admin-logistics-orders-page::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(113, 121, 136, 0.13) 0.7px, transparent 0.8px);
+  background-size: 28px 28px;
+  content: "";
+  opacity: 0.42;
+  pointer-events: none;
+}
+
+.admin-logistics-orders-content {
+  position: relative;
+  z-index: 1;
+  padding-top: clamp(56px, 9vh, 104px);
+  padding-bottom: 112px;
+}
+
+.admin-logistics-orders-page .shop-handoff-queue,
+.admin-logistics-orders-page .table-panel,
+.admin-logistics-orders-page .panel,
+.admin-logistics-orders-page .empty-state {
+  border-color: #e1e4ea;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 24px 64px rgba(32, 37, 48, 0.1);
+}
+
+.admin-logistics-orders-page .shop-handoff-queue,
+.admin-logistics-orders-page .table-panel {
+  position: relative;
+}
+
+.admin-logistics-orders-page .shop-handoff-queue::before,
+.admin-logistics-orders-page .table-panel::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #ef3b49, #6d5ce7);
+  content: "";
+  z-index: 1;
+}
+
+.admin-logistics-orders-page .shop-handoff-heading {
+  border-bottom-color: #e1e4ea;
+  background: linear-gradient(100deg, rgba(239, 59, 73, 0.07), rgba(109, 92, 231, 0.035), rgba(255, 255, 255, 0.92));
+}
+
+.admin-logistics-orders-page .shop-handoff-heading span {
+  color: #ef3b49;
+}
+
+.admin-logistics-orders-page .shop-handoff-heading > strong {
+  background: #ef3b49;
+  box-shadow: 0 16px 34px rgba(239, 59, 73, 0.22);
+}
+
+.admin-logistics-orders-page .shop-handoff-list article + article {
+  border-top-color: #e1e4ea;
+}
+
+.admin-logistics-orders-page .shop-handoff-list article > div span {
+  color: #ef3b49;
+}
+
+.admin-logistics-orders-page .shop-handoff-list dl > div {
+  border-left-color: #e1e4ea;
+}
+
+.admin-logistics-orders-page .status-filter-pill {
+  border-color: #e1e4ea;
+  background: rgba(255, 255, 255, 0.86);
+  color: #4f5868;
+  font-weight: 750;
+}
+
+.admin-logistics-orders-page .status-filter-pill:hover,
+.admin-logistics-orders-page .status-filter-pill:focus-visible,
+.admin-logistics-orders-page .status-filter-pill.active {
+  border-color: rgba(239, 59, 73, 0.42);
+  background: rgba(239, 59, 73, 0.08);
+  outline: none;
+  color: #d92c3b;
+}
+
+.admin-logistics-orders-page .button:not(.primary) {
+  border-color: #e1e4ea;
+  background: #f4f5f8;
+  color: #202530;
+  font-weight: 750;
+}
+
+.admin-logistics-orders-page .button.primary {
+  border-color: #ef3b49;
+  background: #ef3b49;
+}
+
+.admin-logistics-orders-page .button:not(.primary):hover,
+.admin-logistics-orders-page .button:not(.primary):focus-visible,
+.admin-logistics-orders-page .button.primary:hover,
+.admin-logistics-orders-page .button.primary:focus-visible {
+  border-color: #d92c3b;
+  background: #d92c3b;
+  outline: none;
+  color: #ffffff;
+}
+
+.admin-logistics-orders-page .table th,
+.admin-logistics-orders-page .table td {
+  border-bottom-color: #e1e4ea;
+}
+
+.admin-logistics-orders-page .table th {
+  color: #707888;
+}
+
+.admin-logistics-orders-page .status {
+  background: rgba(239, 59, 73, 0.08);
+  color: #d92c3b;
+}
+
+.admin-logistics-orders-page .status.success {
+  background: rgba(239, 59, 73, 0.1);
+  color: #d92c3b;
 }
 
 .shop-handoff-queue {

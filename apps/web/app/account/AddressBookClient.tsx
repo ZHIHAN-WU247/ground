@@ -4,9 +4,11 @@ import { useEffect, useState } from "react";
 import type { AddressContact } from "@ground/shared";
 import { useI18n } from "../../components/I18nProvider";
 import {
-  deleteAddressBookEntry,
-  listAddressBookEntries,
-  saveAddressBookEntry,
+  deletePersistentAddressBookEntry,
+  listPersistentAddressBookEntries,
+  savePersistentAddressBookEntry
+} from "../../lib/address-book-api";
+import {
   type AddressBookEntry,
   type AddressBookKind
 } from "../../lib/local-address-book";
@@ -50,15 +52,15 @@ export function AddressBookClient({ kind }: AddressBookClientProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const countries = kind === "sender" ? supportedSenderCountries : supportedRecipientCountries;
 
-  const loadEntries = (email: string) => {
-    setEntries(listAddressBookEntries({ ownerEmail: email, kind }));
+  const loadEntries = async (email: string) => {
+    setEntries(await listPersistentAddressBookEntries({ ownerEmail: email, kind }));
   };
 
   useEffect(() => {
     const profile = getActiveLocalUserProfile();
     const email = profile?.email ?? "";
     setOwnerEmail(email);
-    loadEntries(email);
+    void loadEntries(email);
   }, [kind]);
 
   const updateField = <K extends keyof AddressFormState>(field: K, value: AddressFormState[K]) => {
@@ -88,41 +90,46 @@ export function AddressBookClient({ kind }: AddressBookClientProps) {
     setMessage("");
   };
 
-  const removeEntry = (id: string) => {
-    deleteAddressBookEntry({ ownerEmail, id });
-    loadEntries(ownerEmail);
+  const removeEntry = async (id: string) => {
+    await deletePersistentAddressBookEntry({ ownerEmail, id });
+    await loadEntries(ownerEmail);
     setMessage(t("account.addressBook.deleted"));
   };
 
-  const makeDefault = (entry: AddressBookEntry) => {
-    saveAddressBookEntry({
+  const makeDefault = async (entry: AddressBookEntry) => {
+    await savePersistentAddressBookEntry({
       ownerEmail,
       entry: {
         ...entry,
         isDefault: true
       }
     });
-    loadEntries(ownerEmail);
+    await loadEntries(ownerEmail);
     setMessage(t("account.addressBook.defaultSaved"));
   };
 
-  const saveEntry = (event: React.FormEvent<HTMLFormElement>) => {
+  const saveEntry = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setIsSubmitting(true);
     setMessage("");
 
-    const saved = saveAddressBookEntry({
-      ownerEmail,
-      entry: {
-        ...form,
-        kind
-      }
-    });
+    try {
+      const saved = await savePersistentAddressBookEntry({
+        ownerEmail,
+        entry: {
+          ...form,
+          kind,
+          createdAt: "",
+          updatedAt: ""
+        }
+      });
 
-    loadEntries(ownerEmail);
-    resetForm();
-    setMessage(t(form.id ? "account.addressBook.updated" : "account.addressBook.saved", { label: saved.label }));
-    setIsSubmitting(false);
+      await loadEntries(ownerEmail);
+      resetForm();
+      setMessage(t(form.id ? "account.addressBook.updated" : "account.addressBook.saved", { label: saved.label }));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
