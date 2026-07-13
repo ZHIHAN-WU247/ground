@@ -901,6 +901,16 @@ Object.assign(dictionaries.en, {
   "shop.checkout.postalCode": "Postal code",
   "shop.checkout.successEyebrow": "Order submitted",
   "shop.checkout.continueShopping": "Continue shopping",
+  "shop.checkout.viewMyOrders": "View my orders",
+  "shop.checkout.recipientEyebrow": "Saved recipients",
+  "shop.checkout.quickRecipients": "Quick select saved recipient",
+  "shop.checkout.manageRecipients": "Manage address book",
+  "shop.checkout.importAddressBook": "Import selected recipient",
+  "shop.checkout.addressBookPlaceholder": "Select a saved recipient",
+  "shop.checkout.addressBookEmpty": "No saved recipients yet. Save one in the address book first.",
+  "shop.checkout.addressImported": "Saved recipient imported.",
+  "shop.checkout.loginAction": "Sign in to submit",
+  "shop.checkout.loginRequired": "Sign in with Supabase before submitting this shop order.",
   "shop.orders.eyebrow": "Orders",
   "shop.orders.title": "Shop orders",
   "shop.orders.description": "Shop orders are managed independently. When shipment is needed, only a logistics reference number is shown and tracking is handled in logistics.",
@@ -1227,6 +1237,32 @@ Object.assign(dictionaries.ru, {
 export function isLocale(value: string | null): value is Locale {
   return value !== null && locales.includes(value as Locale);
 }
+
+Object.assign(dictionaries.zh, {
+  "shop.checkout.viewMyOrders": "查看我的订单",
+  "shop.checkout.recipientEyebrow": "常用收件人",
+  "shop.checkout.quickRecipients": "快捷选择常用收件人",
+  "shop.checkout.manageRecipients": "管理地址簿",
+  "shop.checkout.importAddressBook": "导入选中收件人",
+  "shop.checkout.addressBookPlaceholder": "选择已保存收件人",
+  "shop.checkout.addressBookEmpty": "暂无常用收件人，请先到地址簿保存。",
+  "shop.checkout.addressImported": "已导入常用收件人。",
+  "shop.checkout.loginAction": "登录后提交",
+  "shop.checkout.loginRequired": "请先登录 Supabase 账户后再提交商城订单。"
+});
+
+Object.assign(dictionaries.ru, {
+  "shop.checkout.viewMyOrders": "My orders",
+  "shop.checkout.recipientEyebrow": "Saved recipients",
+  "shop.checkout.quickRecipients": "Quick select saved recipient",
+  "shop.checkout.manageRecipients": "Manage address book",
+  "shop.checkout.importAddressBook": "Import selected recipient",
+  "shop.checkout.addressBookPlaceholder": "Select a saved recipient",
+  "shop.checkout.addressBookEmpty": "No saved recipients yet. Save one in the address book first.",
+  "shop.checkout.addressImported": "Saved recipient imported.",
+  "shop.checkout.loginAction": "Sign in to submit",
+  "shop.checkout.loginRequired": "Sign in with Supabase before submitting this shop order."
+});
 
 export function translate(locale: Locale, key: TranslationKey, values: Record<string, string | number> = {}) {
   const template = dictionaries[locale][key] ?? dictionaries.zh[key] ?? key;

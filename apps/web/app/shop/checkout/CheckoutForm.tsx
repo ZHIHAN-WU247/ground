@@ -4,13 +4,15 @@ import type { FormEvent } from "react";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Users } from "lucide-react";
+import { Check, LogIn, MapPin, PackageCheck, Users } from "lucide-react";
 import type { AddressContact, Product, ShopOrder } from "@ground/shared";
 import { useI18n } from "../../../components/I18nProvider";
 import { listPersistentAddressBookEntries } from "../../../lib/address-book-api";
 import { getJson, postJson } from "../../../lib/api";
 import type { AddressBookEntry } from "../../../lib/local-address-book";
 import { getActiveLocalUserProfile } from "../../../lib/local-user-profile";
+import { getSupabaseAccessToken } from "../../../lib/supabase-auth";
+import { isCheckoutOrderAuthReady } from "./checkout-auth";
 
 type CheckoutRecipientForm = Required<Pick<AddressContact, "name" | "phone" | "country" | "province" | "city" | "postalCode" | "addressLine">> & {
   email: string;
@@ -65,7 +67,7 @@ export function CheckoutForm() {
 
     void listPersistentAddressBookEntries({ ownerEmail, kind: "recipient" }).then((recipients) => {
       setRecipientAddressBook(recipients);
-      setSelectedRecipientAddressId(recipients[0]?.id ?? "");
+      setSelectedRecipientAddressId(recipients.find((entry) => entry.isDefault)?.id ?? recipients[0]?.id ?? "");
     });
   }, []);
 
@@ -108,14 +110,17 @@ export function CheckoutForm() {
   }, [productId, skuId, t]);
 
   const selectedSku = useMemo(() => product?.skus.find((item) => item.id === skuId), [product, skuId]);
+  const visibleRecipientAddressBook = useMemo(
+    () => [...recipientAddressBook].sort((a, b) => Number(b.isDefault) - Number(a.isDefault)).slice(0, 3),
+    [recipientAddressBook]
+  );
+  const loginReturnPath = `/shop/checkout?productId=${encodeURIComponent(productId)}&skuId=${encodeURIComponent(skuId)}&quantity=${quantity}`;
 
   const updateRecipientField = <K extends keyof CheckoutRecipientForm>(field: K, value: CheckoutRecipientForm[K]) => {
     setRecipientForm((current) => ({ ...current, [field]: value }));
   };
 
-  const importSavedRecipient = () => {
-    const entry = recipientAddressBook.find((item) => item.id === selectedRecipientAddressId) ?? recipientAddressBook[0];
-
+  const applyRecipientEntry = (entry: AddressBookEntry | undefined) => {
     if (!entry) {
       setAddressBookMessage(t("shop.checkout.addressBookEmpty"));
       setIsAddressBookSuccess(false);
@@ -128,11 +133,20 @@ export function CheckoutForm() {
     setIsAddressBookSuccess(true);
   };
 
+  const importSavedRecipient = () => {
+    applyRecipientEntry(recipientAddressBook.find((item) => item.id === selectedRecipientAddressId) ?? visibleRecipientAddressBook[0]);
+  };
+
   const submitOrder = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
     if (!product || !selectedSku) {
       setError(t("shop.checkout.selectionMissing"));
+      return;
+    }
+
+    if (!isCheckoutOrderAuthReady(getSupabaseAccessToken())) {
+      setError(t("shop.checkout.loginRequired"));
       return;
     }
 
@@ -199,7 +213,7 @@ export function CheckoutForm() {
       <div className="checkout-product-summary">
         <img src={product.imageUrl} alt={product.name} />
         <div>
-          <span>{product.category}</span>
+          <span className="checkout-summary-kicker"><PackageCheck aria-hidden="true" />{product.category}</span>
           <h2>{product.name}</h2>
           <p>{selectedSku.model} · {selectedSku.size} × {quantity}</p>
           <strong>{selectedSku.price * quantity} {selectedSku.currency}</strong>
@@ -208,24 +222,52 @@ export function CheckoutForm() {
 
       <section className="checkout-recipient-panel">
         <div className="section-heading-row">
-          <div><h2>{t("shop.checkout.recipientDetails")}</h2><p>{t("shop.checkout.recipientHint")}</p></div>
-          <button className="button" type="button" onClick={importSavedRecipient}>
-            <Users aria-hidden="true" />
-            {t("shop.checkout.importAddressBook")}
-          </button>
+          <div>
+            <p className="eyebrow">{t("shop.checkout.recipientEyebrow")}</p>
+            <h2>{t("shop.checkout.recipientDetails")}</h2>
+            <p>{t("shop.checkout.recipientHint")}</p>
+          </div>
+          <Link className="button checkout-login-link" href={`/auth/login?returnTo=${encodeURIComponent(loginReturnPath)}`}>
+            <LogIn aria-hidden="true" />
+            {t("shop.checkout.loginAction")}
+          </Link>
         </div>
-        <div className="address-import-row">
-          <select value={selectedRecipientAddressId} onChange={(event) => setSelectedRecipientAddressId(event.target.value)}>
-            <option value="">{t("shop.checkout.addressBookPlaceholder")}</option>
-            {recipientAddressBook.map((entry) => (
-              <option key={entry.id} value={entry.id}>
-                {entry.label} / {entry.name} / {entry.city}
-              </option>
-            ))}
-          </select>
-          <button className="button" type="button" onClick={importSavedRecipient}>
-            {t("shop.checkout.importAddressBook")}
-          </button>
+        <div className="checkout-address-book">
+          <div className="checkout-address-book-head">
+            <span><Users aria-hidden="true" />{t("shop.checkout.quickRecipients")}</span>
+            <Link href="/account/recipients">{t("shop.checkout.manageRecipients")}</Link>
+          </div>
+          {visibleRecipientAddressBook.length > 0 ? (
+            <div className="checkout-address-card-grid">
+              {visibleRecipientAddressBook.map((entry) => (
+                <button
+                  className={entry.id === selectedRecipientAddressId ? "checkout-address-card active" : "checkout-address-card"}
+                  key={entry.id}
+                  type="button"
+                  onClick={() => applyRecipientEntry(entry)}
+                >
+                  <span>{entry.isDefault ? <Check aria-hidden="true" /> : <MapPin aria-hidden="true" />}{entry.label}</span>
+                  <strong>{entry.name}</strong>
+                  <small>{entry.city}, {entry.country} / {entry.phone}</small>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="checkout-address-empty">{t("shop.checkout.addressBookEmpty")}</div>
+          )}
+          <div className="address-import-row">
+            <select value={selectedRecipientAddressId} onChange={(event) => setSelectedRecipientAddressId(event.target.value)}>
+              <option value="">{t("shop.checkout.addressBookPlaceholder")}</option>
+              {recipientAddressBook.map((entry) => (
+                <option key={entry.id} value={entry.id}>
+                  {entry.label} / {entry.name} / {entry.city}
+                </option>
+              ))}
+            </select>
+            <button className="button" type="button" onClick={importSavedRecipient}>
+              {t("shop.checkout.importAddressBook")}
+            </button>
+          </div>
         </div>
         {addressBookMessage ? <p className={isAddressBookSuccess ? "status success" : "status danger"}>{addressBookMessage}</p> : null}
         <div className="form-grid">
