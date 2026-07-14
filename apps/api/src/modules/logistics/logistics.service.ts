@@ -10,6 +10,7 @@ import type {
   LogisticsQuoteRequest,
   LogisticsRegionCityConfig,
   LogisticsRegionCountryConfig,
+  LogisticsRouteQuotePrice,
   LogisticsQuoteSnapshot,
   LogisticsReviewState,
   LogisticsRouteId,
@@ -166,7 +167,16 @@ export class LogisticsService {
   }
 
   async createQuote(input: LogisticsQuoteRequest): Promise<LogisticsQuote> {
-    return this.cdekCarrierProvider.calculateQuote(input);
+    const quote = await this.cdekCarrierProvider.calculateQuote(input);
+
+    if (quote.cargoType !== "B2C") {
+      return quote;
+    }
+
+    return {
+      ...quote,
+      routePrices: this.buildRouteQuotePrices(quote, await this.listPricingRouteConfigs())
+    };
   }
 
   async createOrder(input: CreateLogisticsOrderDto): Promise<LogisticsOrder> {
@@ -188,6 +198,7 @@ export class LogisticsService {
       ? await this.buildOrderQuoteSnapshot({
           cargoType: input.cargoType,
           deliveryMethod: input.deliveryMethod ?? "TO_DOOR",
+          routeId,
           recipient: input.recipient,
           declaredCurrency,
           weightKg: packageMeasurements.weightKg,
@@ -593,6 +604,7 @@ export class LogisticsService {
   private async buildOrderQuoteSnapshot(input: {
     cargoType: CreateLogisticsOrderDto["cargoType"];
     deliveryMethod: NonNullable<CreateLogisticsOrderDto["deliveryMethod"]>;
+    routeId: LogisticsRouteId;
     recipient: CreateLogisticsOrderDto["recipient"];
     declaredCurrency: CurrencyCode;
     weightKg: number;
@@ -618,7 +630,51 @@ export class LogisticsService {
       ...(input.recipient.fiasGuid ? { destinationFiasGuid: input.recipient.fiasGuid } : {})
     });
 
-    return this.toQuoteSnapshot(quote);
+    return this.toQuoteSnapshot(quote, input.routeId);
+  }
+
+  private buildRouteQuotePrices(quote: LogisticsQuote, configs: LogisticsPricingRouteConfig[]): LogisticsRouteQuotePrice[] {
+    const cdekLastMileAmount = quote.totalAmount ?? quote.amount;
+    return configs
+      .filter((config) => config.cargoType === "B2C" && config.isActive)
+      .sort((current, next) => current.sortOrder - next.sortOrder)
+      .map((config) => {
+        const lastMileAmount = this.convertToCny(cdekLastMileAmount, quote.currency, config.rubPerCny ?? 11);
+        const firstMileAmount = this.calculateFirstMileAmount(quote.chargeableWeightKg, config);
+        const totalAmount = this.roundMoney(firstMileAmount + lastMileAmount);
+
+        return {
+          routeId: config.routeId,
+          labelKey: config.labelKey,
+          noteKey: config.noteKey,
+          amount: totalAmount,
+          firstMileAmount,
+          lastMileAmount,
+          totalAmount,
+          currency: "CNY" as const
+        };
+      });
+  }
+
+  private calculateFirstMileAmount(weightKg: number, config: LogisticsPricingRouteConfig) {
+    if (config.formula === "half_kg_step") {
+      const units = this.getBillableHalfKgUnits(weightKg, config.halfKgUnit);
+      return this.roundMoney((config.baseAmount ?? 0) + (units - 1) * (config.stepAmount ?? 0));
+    }
+
+    if (config.formula === "per_kg") {
+      return this.roundMoney(this.getBillableHalfKgUnits(weightKg, config.halfKgUnit) * config.halfKgUnit * (config.perKgAmount ?? 0));
+    }
+
+    return this.roundMoney(this.getBillableHalfKgUnits(weightKg, config.halfKgUnit) * config.halfKgUnit * (config.firstMileCnyPerKg ?? 0));
+  }
+
+  private getBillableHalfKgUnits(weightKg: number, halfKgUnit: number) {
+    return Math.max(1, Math.ceil(weightKg / halfKgUnit));
+  }
+
+  private convertToCny(amount: number, currency: CurrencyCode, rubPerCny: number) {
+    return currency === "RUB" ? this.roundMoney(amount / rubPerCny) : this.roundMoney(amount);
   }
 
   private roundMoney(value: number) {
@@ -645,17 +701,19 @@ export class LogisticsService {
     };
   }
 
-  private toQuoteSnapshot(quote: LogisticsQuote): LogisticsQuoteSnapshot {
+  private toQuoteSnapshot(quote: LogisticsQuote, routeId?: LogisticsRouteId): LogisticsQuoteSnapshot {
+    const routePrice = routeId ? quote.routePrices?.find((price) => price.routeId === routeId) : undefined;
+
     return {
       deliveryMethod: quote.deliveryMethod,
       actualWeightKg: quote.actualWeightKg,
       volumetricWeightKg: quote.volumetricWeightKg,
       chargeableWeightKg: quote.chargeableWeightKg,
-      amount: quote.amount,
-      firstMileAmount: quote.firstMileAmount,
-      lastMileAmount: quote.lastMileAmount,
-      totalAmount: quote.totalAmount,
-      currency: quote.currency,
+      amount: routePrice?.amount ?? quote.amount,
+      firstMileAmount: routePrice?.firstMileAmount ?? quote.firstMileAmount,
+      lastMileAmount: routePrice?.lastMileAmount ?? quote.lastMileAmount,
+      totalAmount: routePrice?.totalAmount ?? quote.totalAmount,
+      currency: routePrice?.currency ?? quote.currency,
       ...(quote.cdekTariffCode ? { cdekTariffCode: quote.cdekTariffCode } : {}),
       ...(quote.cdekDeliveryMinDays !== undefined ? { cdekDeliveryMinDays: quote.cdekDeliveryMinDays } : {}),
       ...(quote.cdekDeliveryMaxDays !== undefined ? { cdekDeliveryMaxDays: quote.cdekDeliveryMaxDays } : {}),

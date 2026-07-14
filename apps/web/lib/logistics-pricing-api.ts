@@ -11,11 +11,7 @@ export async function listPricingRouteConfigs(): Promise<LogisticsPricingRouteCo
 }
 
 export async function listAdminPricingRouteConfigs(): Promise<LogisticsPricingRouteConfig[]> {
-  try {
-    return await getAdminJson<LogisticsPricingRouteConfig[]>("/admin/logistics/pricing/routes");
-  } catch {
-    return defaultLogisticsPricingRouteConfigs;
-  }
+  return getAdminJson<LogisticsPricingRouteConfig[]>("/admin/logistics/pricing/routes");
 }
 
 export async function updateAdminPricingRouteConfig(routeId: LogisticsRouteId, patch: Partial<LogisticsPricingRouteConfig>) {

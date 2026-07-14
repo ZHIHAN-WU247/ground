@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { FixedCarrierProvider } from "../carrier/fixed-carrier.provider";
 import { CdekCarrierProvider } from "../carrier/cdek-carrier.provider";
 import { LogisticsService } from "./logistics.service";
+import { defaultLogisticsPricingRouteConfigs, type LogisticsPricingRouteConfig } from "@ground/shared";
 
 class StubCdekCarrierProvider extends CdekCarrierProvider {
   override async calculateQuote(input: Parameters<CdekCarrierProvider["calculateQuote"]>[0]) {
@@ -47,12 +48,83 @@ class StubCdekCarrierProvider extends CdekCarrierProvider {
   }
 }
 
+function createPricingService(routeConfigs: LogisticsPricingRouteConfig[]) {
+  const rows = routeConfigs.map((config, index) => ({
+    id: `table-${config.routeId}`,
+    cargo_type: config.cargoType,
+    route_id: config.routeId,
+    delivery_method: config.deliveryMethod,
+    name: config.labelKey,
+    currency: config.currency,
+    is_active: config.isActive,
+    template_version: "route-config-v1",
+    metadata: {
+      label_key: config.labelKey,
+      note_key: config.noteKey,
+      sort_order: config.sortOrder
+    },
+    created_at: `2026-07-14T00:00:0${index}.000Z`,
+    updated_at: `2026-07-14T00:00:0${index}.000Z`,
+    pricing_rules: [
+      {
+        id: `rule-${config.routeId}`,
+        pricing_table_id: `table-${config.routeId}`,
+        destination_country: "Russia",
+        destination_city: "*",
+        min_weight_kg: 0,
+        max_weight_kg: null,
+        base_price: config.baseAmount ?? 0,
+        per_kg_price: config.perKgAmount ?? 0,
+        first_mile_price: config.firstMileCnyPerKg ?? 0,
+        last_mile_price: 0,
+        volumetric_divisor: 6000,
+        metadata: {
+          formula: config.formula,
+          half_kg_unit: config.halfKgUnit,
+          step_price: config.stepAmount ?? 0,
+          rub_per_cny: config.rubPerCny ?? 11
+        },
+        created_at: `2026-07-14T00:00:0${index}.000Z`
+      }
+    ]
+  }));
+
+  const query = {
+    select: () => query,
+    eq: () => query,
+    order: () => query,
+    then: (resolve: (value: unknown) => void) => resolve({ data: rows, error: null })
+  };
+
+  return {
+    client: {
+      from: () => query
+    }
+  };
+}
+
 const run = async () => {
   const isolatedDirectory = mkdtempSync(join(tmpdir(), "ground-logistics-isolated-"));
   const service = new LogisticsService(
     new FixedCarrierProvider(),
     new StubCdekCarrierProvider(),
     join(isolatedDirectory, "logistics-orders.json")
+  );
+  const customPricingService = new LogisticsService(
+    new FixedCarrierProvider(),
+    new StubCdekCarrierProvider(),
+    join(isolatedDirectory, "custom-pricing-orders.json"),
+    createPricingService(defaultLogisticsPricingRouteConfigs.map((config) => {
+      if (config.routeId === "air-cdek") {
+        return { ...config, firstMileCnyPerKg: 120, rubPerCny: 10 };
+      }
+
+      if (config.routeId === "land-cdek") {
+        return { ...config, firstMileCnyPerKg: 40, rubPerCny: 10 };
+      }
+
+      return config;
+    })) as never
   );
 
   const approved = await service.reviewOrder("log-1002", {
@@ -93,6 +165,33 @@ const run = async () => {
   assert.equal(quote.totalAmount, 320);
   assert.equal(quote.amount, 320);
   assert.equal(quote.currency, "RUB");
+
+  const pricedQuote = await customPricingService.createQuote({
+    cargoType: "B2C" as const,
+    destinationCountry: "Russia",
+    destinationCity: "Moscow",
+    deliveryMethod: "TO_DOOR",
+    currency: "CNY",
+    weightKg: 6.5,
+    lengthCm: 42,
+    widthCm: 36,
+    heightCm: 28,
+    packageCount: 2
+  });
+
+  assert.deepEqual(
+    pricedQuote.routePrices?.filter((route) => route.routeId === "air-cdek" || route.routeId === "land-cdek").map((route) => ({
+      routeId: route.routeId,
+      firstMileAmount: route.firstMileAmount,
+      lastMileAmount: route.lastMileAmount,
+      totalAmount: route.totalAmount,
+      currency: route.currency
+    })),
+    [
+      { routeId: "air-cdek", firstMileAmount: 1740, lastMileAmount: 32, totalAmount: 1772, currency: "CNY" },
+      { routeId: "land-cdek", firstMileAmount: 580, lastMileAmount: 32, totalAmount: 612, currency: "CNY" }
+    ]
+  );
 
   const createOrderInput = {
     ownerEmail: "Customer@Example.com",
@@ -155,11 +254,11 @@ const run = async () => {
     actualWeightKg: 6.5,
     volumetricWeightKg: 7.06,
     chargeableWeightKg: 14.11,
-    amount: 320,
-    firstMileAmount: 0,
-    lastMileAmount: 320,
-    totalAmount: 320,
-    currency: "RUB",
+    amount: 1334.09,
+    firstMileAmount: 1305,
+    lastMileAmount: 29.09,
+    totalAmount: 1334.09,
+    currency: "CNY",
     cdekTariffCode: 139,
     cdekDeliveryMinDays: 1,
     cdekDeliveryMaxDays: 2
