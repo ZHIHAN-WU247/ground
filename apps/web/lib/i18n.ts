@@ -1610,6 +1610,75 @@ Object.assign(dictionaries.en, {
   "orderCreate.cargo.itemsInvalid": "Fill the item name, RMB value, and quantity for every cargo row."
 });
 
+Object.assign(dictionaries.zh, {
+  "orderCreate.delivery.title": "配送方式",
+  "orderCreate.delivery.note": "请选择末端配送方式，系统会按所选方式计算尾端报价。",
+  "orderCreate.delivery.TO_DOOR.note": "配送至收件人详细地址。",
+  "orderCreate.delivery.TO_WAREHOUSE.note": "配送至末端仓库或自提点。",
+  "orderCreate.package.title": "包裹信息",
+  "orderCreate.package.weightKg": "重量（kg）",
+  "orderCreate.package.lengthCm": "长（cm）",
+  "orderCreate.package.widthCm": "宽（cm）",
+  "orderCreate.package.heightCm": "高（cm）",
+  "orderCreate.package.invalid": "请填写有效的包裹重量和长、宽、高。",
+  "orderCreate.quote.finalAmount": "最终价格：{value}",
+  "orderCreate.quote.route": "路线：{value}",
+  "orderCreate.quote.confirmButton": "确认报价",
+  "orderCreate.quote.confirming": "正在确认报价...",
+  "orderCreate.quote.incomplete": "请先填写完整的收件人与包裹信息。",
+  "orderCreate.quote.required": "提交前请先确认当前报价。",
+  "orderCreate.quote.routeMissing": "当前报价缺少所选路线价格，请重新确认报价。",
+  "orderCreate.quote.stale": "表单信息已变化，请重新确认报价。",
+  "orderCreate.quote.unconfirmed": "填写完整信息后，点击确认报价生成价格快照。",
+  "orderCreate.confirm.myOrders": "我的订单"
+});
+
+Object.assign(dictionaries.en, {
+  "orderCreate.delivery.title": "Delivery method",
+  "orderCreate.delivery.note": "Choose the last-mile delivery method. Pricing follows this selection.",
+  "orderCreate.delivery.TO_DOOR.note": "Deliver to the recipient's full address.",
+  "orderCreate.delivery.TO_WAREHOUSE.note": "Deliver to a last-mile warehouse or pickup point.",
+  "orderCreate.package.title": "Package information",
+  "orderCreate.package.weightKg": "Weight (kg)",
+  "orderCreate.package.lengthCm": "Length (cm)",
+  "orderCreate.package.widthCm": "Width (cm)",
+  "orderCreate.package.heightCm": "Height (cm)",
+  "orderCreate.package.invalid": "Enter a valid package weight, length, width, and height.",
+  "orderCreate.quote.finalAmount": "Final amount: {value}",
+  "orderCreate.quote.route": "Route: {value}",
+  "orderCreate.quote.confirmButton": "Confirm quote",
+  "orderCreate.quote.confirming": "Confirming quote...",
+  "orderCreate.quote.incomplete": "Complete the recipient and package information first.",
+  "orderCreate.quote.required": "Confirm the current quote before submitting.",
+  "orderCreate.quote.routeMissing": "The current quote is missing the selected route price. Confirm the quote again.",
+  "orderCreate.quote.stale": "The form information changed. Confirm the quote again.",
+  "orderCreate.quote.unconfirmed": "After completing the information, confirm the quote to create a price snapshot.",
+  "orderCreate.confirm.myOrders": "My orders"
+});
+
+Object.assign(dictionaries.ru, {
+  "orderCreate.delivery.title": "Способ доставки",
+  "orderCreate.delivery.note": "Выберите способ доставки последней мили. Расчет цены зависит от этого выбора.",
+  "orderCreate.delivery.TO_DOOR.note": "Доставка до полного адреса получателя.",
+  "orderCreate.delivery.TO_WAREHOUSE.note": "Доставка до склада последней мили или пункта выдачи.",
+  "orderCreate.package.title": "Информация о посылке",
+  "orderCreate.package.weightKg": "Вес (кг)",
+  "orderCreate.package.lengthCm": "Длина (см)",
+  "orderCreate.package.widthCm": "Ширина (см)",
+  "orderCreate.package.heightCm": "Высота (см)",
+  "orderCreate.package.invalid": "Укажите корректные вес, длину, ширину и высоту посылки.",
+  "orderCreate.quote.finalAmount": "Итоговая цена: {value}",
+  "orderCreate.quote.route": "Маршрут: {value}",
+  "orderCreate.quote.confirmButton": "Подтвердить цену",
+  "orderCreate.quote.confirming": "Подтверждаем цену...",
+  "orderCreate.quote.incomplete": "Сначала заполните данные получателя и посылки.",
+  "orderCreate.quote.required": "Перед отправкой подтвердите текущую цену.",
+  "orderCreate.quote.routeMissing": "В текущем расчете нет цены для выбранного маршрута. Подтвердите цену еще раз.",
+  "orderCreate.quote.stale": "Данные формы изменились. Подтвердите цену еще раз.",
+  "orderCreate.quote.unconfirmed": "После заполнения данных подтвердите цену, чтобы создать снимок расчета.",
+  "orderCreate.confirm.myOrders": "Мои заказы"
+});
+
 Object.assign(dictionaries.ru, {
   "orderCreate.description": "Заполните отправителя, получателя и товарные строки, чтобы операторы проверили заказ по позициям.",
   "orderCreate.confirm.note": "Операторы смогут проверить отправителя, получателя и товарные строки, затем продолжить проверку посылки.",
