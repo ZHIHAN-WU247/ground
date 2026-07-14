@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 
 import type { LogisticsOrder } from "@ground/shared";
-import { buildQuoteRoutePrices } from "../../logistics/quote/quote-routes";
 import { formatAccountLogisticsQuote } from "./account-order-quotes";
 
 const fallback = "待报价";
@@ -57,12 +56,7 @@ const orderWithAirCdekQuote: LogisticsOrder = {
 };
 
 const accountQuote = formatAccountLogisticsQuote(orderWithAirCdekQuote, fallback);
-const quotePageRoutePrice = buildQuoteRoutePrices({
-  ...orderWithAirCdekQuote.estimatedQuote!,
-  cargoType: orderWithAirCdekQuote.cargoType
-}).find((route) => route.id === orderWithAirCdekQuote.routeId);
-
-assert.equal(accountQuote, `${quotePageRoutePrice!.amount.toFixed(2)} ${quotePageRoutePrice!.currency}`);
+assert.equal(accountQuote, "385.00 RUB");
 
 const { estimatedQuote: _estimatedQuote, ...orderWithoutQuote } = orderWithAirCdekQuote;
 assert.equal(formatAccountLogisticsQuote(orderWithoutQuote, fallback), fallback);

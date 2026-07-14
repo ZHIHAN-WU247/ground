@@ -17,7 +17,9 @@ export function AdminPricingClient() {
   const [savingRouteId, setSavingRouteId] = useState("");
 
   useEffect(() => {
-    void listAdminPricingRouteConfigs().then(setConfigs);
+    void listAdminPricingRouteConfigs()
+      .then(setConfigs)
+      .catch((error) => setMessage(error instanceof Error ? error.message : "Failed to load pricing routes."));
   }, []);
 
   const updateConfig = <K extends keyof LogisticsPricingRouteConfig>(routeId: string, field: K, value: LogisticsPricingRouteConfig[K]) => {

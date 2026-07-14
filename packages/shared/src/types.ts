@@ -450,6 +450,17 @@ export interface LogisticsQuoteRequest {
   destinationFiasGuid?: string;
 }
 
+export interface LogisticsRouteQuotePrice {
+  routeId: LogisticsRouteId;
+  labelKey: string;
+  noteKey: string;
+  amount: number;
+  firstMileAmount: number;
+  lastMileAmount: number;
+  totalAmount: number;
+  currency: CurrencyCode;
+}
+
 export interface LogisticsQuote {
   id: string;
   cargoType: CargoType;
@@ -468,6 +479,7 @@ export interface LogisticsQuote {
   cdekDeliveryMinDays?: number;
   cdekDeliveryMaxDays?: number;
   exchangeRateNote?: string;
+  routePrices?: LogisticsRouteQuotePrice[];
   breakdown: Array<{
     label: string;
     amount: number;

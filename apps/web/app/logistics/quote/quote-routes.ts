@@ -25,11 +25,21 @@ export const quoteRouteOptions: QuoteRouteOption[] = [
 ];
 
 export function buildQuoteRoutePrices(
-  quote: Pick<LogisticsQuote, "cargoType" | "currency" | "totalAmount" | "amount" | "chargeableWeightKg">,
+  quote: Pick<LogisticsQuote, "cargoType" | "currency" | "totalAmount" | "amount" | "chargeableWeightKg" | "routePrices">,
   configs: LogisticsPricingRouteConfig[] = defaultLogisticsPricingRouteConfigs
 ): QuoteRoutePrice[] {
   if (quote.cargoType !== "B2C") {
     return [];
+  }
+
+  if (quote.routePrices?.length) {
+    return quote.routePrices.map((route) => ({
+      id: route.routeId,
+      labelKey: route.labelKey,
+      noteKey: route.noteKey,
+      amount: route.amount,
+      currency: route.currency
+    }));
   }
 
   const cdekLastMileAmount = quote.totalAmount ?? quote.amount;
@@ -49,7 +59,7 @@ export function buildQuoteRoutePrices(
 }
 
 export function selectQuoteRoutePrice(
-  quote: Pick<LogisticsQuote, "cargoType" | "currency" | "totalAmount" | "amount" | "chargeableWeightKg">,
+  quote: Pick<LogisticsQuote, "cargoType" | "currency" | "totalAmount" | "amount" | "chargeableWeightKg" | "routePrices">,
   routeId: LogisticsRouteId,
   configs: LogisticsPricingRouteConfig[] = defaultLogisticsPricingRouteConfigs
 ) {
