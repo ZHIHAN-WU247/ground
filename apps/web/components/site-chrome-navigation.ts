@@ -1,1 +1,4 @@
-export const getAdminNavHref = (hasAdminSession: boolean) => (hasAdminSession ? "/admin" : "/admin/login?next=%2Fadmin");
+export const publicNavItems = [
+  { href: "/logistics", labelKey: "nav.logistics" },
+  { href: "/shop", labelKey: "nav.shop" }
+] as const;
