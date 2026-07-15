@@ -11,14 +11,7 @@ import {
   getActiveLocalUserProfile,
   LOCAL_USER_PROFILE_EVENT
 } from "../lib/local-user-profile";
-import { isSupabaseAdminSession, SUPABASE_AUTH_EVENT } from "../lib/supabase-auth";
-import { getAdminNavHref } from "./site-chrome-navigation";
-
-const navItems = [
-  { href: "/logistics", labelKey: "nav.logistics" },
-  { href: "/shop", labelKey: "nav.shop" },
-  { href: "/admin", labelKey: "nav.admin" }
-];
+import { publicNavItems } from "./site-chrome-navigation";
 
 const authNavLabels = {
   zh: {
@@ -43,7 +36,6 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { locale, t } = useI18n();
   const [isSignedIn, setIsSignedIn] = useState(false);
-  const [isAdminSignedIn, setIsAdminSignedIn] = useState(false);
 
   useEffect(() => {
     const syncAuthState = () => {
@@ -58,21 +50,6 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
     return () => {
       window.removeEventListener("storage", syncAuthState);
       window.removeEventListener(LOCAL_USER_PROFILE_EVENT, syncAuthState);
-    };
-  }, []);
-
-  useEffect(() => {
-    const syncAdminState = () => {
-      setIsAdminSignedIn(isSupabaseAdminSession());
-    };
-
-    syncAdminState();
-    window.addEventListener("storage", syncAdminState);
-    window.addEventListener(SUPABASE_AUTH_EVENT, syncAdminState);
-
-    return () => {
-      window.removeEventListener("storage", syncAdminState);
-      window.removeEventListener(SUPABASE_AUTH_EVENT, syncAdminState);
     };
   }, []);
 
@@ -98,7 +75,7 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
             />
           </Link>
           <nav className="nav-links" aria-label="Main navigation">
-            {navItems.slice(0, 2).map((item) => (
+            {publicNavItems.map((item) => (
               <Link
                 className={isActive(item.href) ? "active" : undefined}
                 key={item.href}
@@ -139,13 +116,6 @@ export function SiteChrome({ children }: { children: React.ReactNode }) {
                 {labels.logout}
               </button>
             ) : null}
-            <Link
-              className={isActive("/admin") ? "active" : undefined}
-              href={getAdminNavHref(isAdminSignedIn)}
-              aria-current={isActive("/admin") ? "page" : undefined}
-            >
-              {t("nav.admin")}
-            </Link>
             <LanguageSwitcher />
           </nav>
         </div>
