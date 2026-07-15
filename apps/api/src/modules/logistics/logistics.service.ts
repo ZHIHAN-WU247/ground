@@ -639,7 +639,8 @@ export class LogisticsService {
       .filter((config) => config.cargoType === "B2C" && config.isActive)
       .sort((current, next) => current.sortOrder - next.sortOrder)
       .map((config) => {
-        const lastMileAmount = this.convertToCny(cdekLastMileAmount, quote.currency, config.rubPerCny ?? 11);
+        const lastMileAmount =
+          config.formula === "cdek_first_last_mile" ? this.convertToCny(cdekLastMileAmount, quote.currency, config.rubPerCny ?? 11) : 0;
         const firstMileAmount = this.calculateFirstMileAmount(quote.chargeableWeightKg, config);
         const totalAmount = this.roundMoney(firstMileAmount + lastMileAmount);
 

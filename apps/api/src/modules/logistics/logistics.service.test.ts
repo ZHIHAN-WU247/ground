@@ -180,7 +180,7 @@ const run = async () => {
   });
 
   assert.deepEqual(
-    pricedQuote.routePrices?.filter((route) => route.routeId === "air-cdek" || route.routeId === "land-cdek").map((route) => ({
+    pricedQuote.routePrices?.filter((route) => ["air-ems", "air-cdek", "land-cdek", "land-russia-post"].includes(route.routeId)).map((route) => ({
       routeId: route.routeId,
       firstMileAmount: route.firstMileAmount,
       lastMileAmount: route.lastMileAmount,
@@ -188,8 +188,10 @@ const run = async () => {
       currency: route.currency
     })),
     [
+      { routeId: "air-ems", firstMileAmount: 1725, lastMileAmount: 0, totalAmount: 1725, currency: "CNY" },
       { routeId: "air-cdek", firstMileAmount: 1740, lastMileAmount: 32, totalAmount: 1772, currency: "CNY" },
-      { routeId: "land-cdek", firstMileAmount: 580, lastMileAmount: 32, totalAmount: 612, currency: "CNY" }
+      { routeId: "land-cdek", firstMileAmount: 580, lastMileAmount: 32, totalAmount: 612, currency: "CNY" },
+      { routeId: "land-russia-post", firstMileAmount: 797.5, lastMileAmount: 0, totalAmount: 797.5, currency: "CNY" }
     ]
   );
 
