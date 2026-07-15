@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ImagePlus, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { shopProductCategories, type CreateProductInput, type CurrencyCode, type Product, type ProductCategorySlug } from "@ground/shared";
 import { patchAdminJson, postAdminJson } from "../../../../../lib/api";
-import { normalizeProductSlug, validateDetailSection, validateProductImage } from "./product-form";
+import { getProductSaveErrorMessage, normalizeProductSlug, validateDetailSection, validateProductImage, validateProductSavePayload } from "./product-form";
 
 interface SkuDraft {
   key: string;
@@ -214,6 +214,12 @@ export function ProductForm({ initialProduct }: ProductFormProps) {
       }))
     };
 
+    const payloadValidationError = validateProductSavePayload(input);
+    if (payloadValidationError) {
+      setError(payloadValidationError);
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       const product = initialProduct
@@ -223,7 +229,7 @@ export function ProductForm({ initialProduct }: ProductFormProps) {
       router.push(`/admin/shop/products?${resultKey}=${encodeURIComponent(product.name)}`);
       router.refresh();
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : "商品保存失败，请稍后重试。");
+      setError(getProductSaveErrorMessage(submitError));
       setIsSubmitting(false);
     }
   };

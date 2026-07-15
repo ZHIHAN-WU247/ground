@@ -3,6 +3,8 @@ import { getActiveLocalUserProfile } from "./local-user-profile";
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
 
+type BrowserLocation = Pick<Location, "hostname" | "protocol">;
+
 interface RequestOptions {
   body?: object;
   headers?: HeadersInit;
@@ -17,7 +19,7 @@ async function requestJson<TResponse>(path: string, options: RequestOptions = {}
     ...(headers ? { headers } : {}),
     ...(options.body ? { body: JSON.stringify(options.body) } : {})
   };
-  const response = await fetch(`${API_BASE_URL}${path}`, requestInit);
+  const response = await fetch(`${getApiBaseUrl()}${path}`, requestInit);
   const responseText = await response.text();
 
   if (!response.ok) {
@@ -25,6 +27,45 @@ async function requestJson<TResponse>(path: string, options: RequestOptions = {}
   }
 
   return (responseText ? JSON.parse(responseText) : {}) as TResponse;
+}
+
+function getApiBaseUrl() {
+  if (typeof window === "undefined" || !window.location) {
+    return API_BASE_URL;
+  }
+
+  return resolveApiBaseUrl(API_BASE_URL, window.location);
+}
+
+export function resolveApiBaseUrl(apiBaseUrl: string, location: BrowserLocation) {
+  const pageHostname = location.hostname.trim();
+
+  if (!pageHostname || isLoopbackHost(pageHostname)) {
+    return apiBaseUrl;
+  }
+
+  try {
+    const url = new URL(apiBaseUrl);
+
+    if (!isLoopbackHost(url.hostname)) {
+      return apiBaseUrl;
+    }
+
+    url.hostname = pageHostname;
+
+    if (location.protocol === "https:" && url.protocol === "http:") {
+      url.protocol = "https:";
+    }
+
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return apiBaseUrl;
+  }
+}
+
+function isLoopbackHost(hostname: string) {
+  const normalized = hostname.toLowerCase();
+  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1" || normalized === "[::1]";
 }
 
 function getErrorMessage(status: number, responseText: string) {
