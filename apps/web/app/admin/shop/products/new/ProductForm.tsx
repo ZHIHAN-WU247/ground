@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { ImagePlus, LoaderCircle, Plus, Trash2 } from "lucide-react";
 import { shopProductCategories, type CreateProductInput, type CurrencyCode, type Product, type ProductCategorySlug } from "@ground/shared";
 import { patchAdminJson, postAdminJson } from "../../../../../lib/api";
+import { uploadProductImage } from "../../../../../lib/product-images-api";
+import { compressProductImageToWebp } from "./product-image-compression";
 import { getProductSaveErrorMessage, normalizeProductSlug, validateDetailSection, validateProductImage, validateProductSavePayload } from "./product-form";
 
 interface SkuDraft {
@@ -40,17 +42,15 @@ const createDetailSection = (): DetailSectionDraft => ({
   imageUrl: ""
 });
 
-const readFileAsDataUrl = (file: File) =>
-  new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.addEventListener("load", () => resolve(String(reader.result)));
-    reader.addEventListener("error", () => reject(new Error("图片读取失败，请重新选择。")));
-    reader.readAsDataURL(file);
-  });
-
 interface ProductFormProps {
   initialProduct?: Product;
 }
+
+const uploadCompressedProductImage = async (file: File) => {
+  const compressed = await compressProductImageToWebp(file);
+  const result = await uploadProductImage(compressed);
+  return result.url;
+};
 
 export function ProductForm({ initialProduct }: ProductFormProps) {
   const router = useRouter();
@@ -78,6 +78,7 @@ export function ProductForm({ initialProduct }: ProductFormProps) {
       : [{ ...createSku(), key: "initial-sku" }]
   );
   const [isPublished, setIsPublished] = useState(initialProduct?.isPublished ?? true);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
@@ -103,10 +104,13 @@ export function ProductForm({ initialProduct }: ProductFormProps) {
     }
 
     setError("");
+    setIsUploadingImage(true);
     try {
-      setCoverImage(await readFileAsDataUrl(file));
+      setCoverImage(await uploadCompressedProductImage(file));
     } catch (fileError) {
-      setError(fileError instanceof Error ? fileError.message : "图片读取失败。");
+      setError(fileError instanceof Error ? fileError.message : "图片上传失败，请稍后重试。");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -126,13 +130,16 @@ export function ProductForm({ initialProduct }: ProductFormProps) {
     }
 
     setError("");
+    setIsUploadingImage(true);
     setGalleryImages((current) => [...current, ...files.map(() => "")]);
     try {
-      const images = await Promise.all(files.map(readFileAsDataUrl));
+      const images = await Promise.all(files.map(uploadCompressedProductImage));
       setGalleryImages((current) => [...current.filter(Boolean), ...images]);
     } catch (fileError) {
       setGalleryImages((current) => current.filter(Boolean));
-      setError(fileError instanceof Error ? fileError.message : "图片读取失败。");
+      setError(fileError instanceof Error ? fileError.message : "图片上传失败，请稍后重试。");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
@@ -157,17 +164,25 @@ export function ProductForm({ initialProduct }: ProductFormProps) {
     }
 
     setError("");
+    setIsUploadingImage(true);
     try {
-      const imageUrl = await readFileAsDataUrl(file);
+      const imageUrl = await uploadCompressedProductImage(file);
       setDetailSections((current) => current.map((section) => (section.key === key ? { ...section, imageUrl } : section)));
     } catch (fileError) {
-      setError(fileError instanceof Error ? fileError.message : "图片读取失败。");
+      setError(fileError instanceof Error ? fileError.message : "图片上传失败，请稍后重试。");
+    } finally {
+      setIsUploadingImage(false);
     }
   };
 
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError("");
+
+    if (isUploadingImage) {
+      setError("图片正在上传，请稍后再保存商品。");
+      return;
+    }
 
     if (!coverImage) {
       setError("请先选择商品封面图。");
@@ -333,8 +348,8 @@ export function ProductForm({ initialProduct }: ProductFormProps) {
         </div>
         <label className="product-publish-toggle"><input checked={isPublished} type="checkbox" onChange={(event) => setIsPublished(event.target.checked)} /><span><strong>{isPublished ? "立即发布" : "保存为草稿"}</strong><small>{isPublished ? "保存后会显示到商城" : "仅管理员可以看到"}</small></span></label>
         {error ? <div className="form-error" role="alert">{error}</div> : null}
-        <button className="button primary product-save-button" disabled={isSubmitting} type="submit">
-          {isSubmitting ? <><LoaderCircle size={17} />正在保存</> : isEditing ? "保存修改" : "保存商品"}
+        <button className="button primary product-save-button" disabled={isSubmitting || isUploadingImage} type="submit">
+          {isSubmitting || isUploadingImage ? <><LoaderCircle size={17} />{isUploadingImage ? "图片上传中" : "正在保存"}</> : isEditing ? "保存修改" : "保存商品"}
         </button>
       </aside>
     </form>

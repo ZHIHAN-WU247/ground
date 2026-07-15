@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { Minus, PackageCheck, Plus, ShieldCheck, Star, Truck } from "lucide-react";
 import type { Product } from "@ground/shared";
+import { buildProductDetailGallery } from "./product-detail-gallery";
 
 interface ProductDetailClientProps {
   product: Product;
@@ -11,7 +12,8 @@ interface ProductDetailClientProps {
 }
 
 export function ProductDetailClient({ product, relatedProducts }: ProductDetailClientProps) {
-  const [activeImage, setActiveImage] = useState(product.galleryImageUrls?.[0] ?? product.imageUrl);
+  const gallery = useMemo(() => buildProductDetailGallery(product), [product]);
+  const [activeImage, setActiveImage] = useState(gallery[0] ?? product.imageUrl);
   const [selectedSkuId, setSelectedSkuId] = useState(product.skus[0]?.id ?? "");
   const [quantity, setQuantity] = useState(1);
 
@@ -19,7 +21,6 @@ export function ProductDetailClient({ product, relatedProducts }: ProductDetailC
     () => product.skus.find((sku) => sku.id === selectedSkuId) ?? product.skus[0],
     [product.skus, selectedSkuId]
   );
-  const gallery = product.galleryImageUrls?.length ? product.galleryImageUrls : [product.imageUrl];
   const checkoutHref = selectedSku
     ? `/shop/checkout?productId=${encodeURIComponent(product.id)}&skuId=${encodeURIComponent(selectedSku.id)}&quantity=${quantity}`
     : "/shop/checkout";

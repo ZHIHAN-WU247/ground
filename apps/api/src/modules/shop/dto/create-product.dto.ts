@@ -18,6 +18,7 @@ import {
 import type { CreateProductInput, CurrencyCode, ProductCategorySlug } from "@ground/shared";
 
 const imageDataUrlPattern = /^data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\r\n]+$/i;
+const imageUrlPattern = /^(?:https?:\/\/\S+|data:image\/(?:jpeg|png|webp);base64,[a-z0-9+/=\r\n]+)$/i;
 
 class CreateProductSkuDto {
   @IsString()
@@ -51,7 +52,7 @@ class ProductDetailSectionDto {
   body: string;
 
   @IsOptional()
-  @Matches(imageDataUrlPattern)
+  @Matches(imageUrlPattern)
   @MaxLength(2_800_000)
   imageUrl?: string;
 }
@@ -73,14 +74,14 @@ export class CreateProductDto implements CreateProductInput {
   @Length(1, 4000)
   description: string;
 
-  @Matches(imageDataUrlPattern)
+  @Matches(imageUrlPattern)
   @MaxLength(2_800_000)
   imageUrl: string;
 
   @IsOptional()
   @IsArray()
   @ArrayMaxSize(5)
-  @Matches(imageDataUrlPattern, { each: true })
+  @Matches(imageUrlPattern, { each: true })
   @MaxLength(2_800_000, { each: true })
   galleryImageUrls?: string[];
 

@@ -68,7 +68,10 @@ const run = async () => {
       logisticsOrder: { id: "030ed125-052e-47f4-aceb-82db7548e633", orderNo: "AE202600000001" }
     })
   };
-  const controller = new AdminShopController(shopService as never, bridgeService as never, auditLogService as never);
+  const productImageUploadService = {
+    uploadProductImage: async () => ({ url: "https://cdn.example.com/product.webp" })
+  };
+  const controller = new AdminShopController(shopService as never, bridgeService as never, auditLogService as never, productImageUploadService as never);
 
   await controller.createProduct({ ...product, galleryImageUrls: [] } as never, request as never);
   await controller.updateOrderStatus(order.id, { status: "CONFIRMED" }, request as never);

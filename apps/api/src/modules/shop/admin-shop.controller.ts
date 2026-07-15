@@ -1,4 +1,5 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Req, UseGuards } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Req, UploadedFile, UseGuards, UseInterceptors } from "@nestjs/common";
+import { FileInterceptor } from "@nestjs/platform-express";
 import type { Product, ShopOrder } from "@ground/shared";
 import { AuditLogService } from "../audit/audit-log.service";
 import { AdminRoleGuard } from "../auth/admin-role.guard";
@@ -9,6 +10,7 @@ import { CreateShopLogisticsOrderDto } from "./dto/create-shop-logistics-order.d
 import { UpdateShopOrderStatusDto } from "./dto/update-shop-order-status.dto";
 import { ShopOrderLogisticsBridgeService } from "./shop-order-logistics-bridge.service";
 import { ShopService } from "./shop.service";
+import { ProductImageUploadService } from "./product-image-upload.service";
 
 interface RequestWithUser {
   user?: AuthenticatedUser;
@@ -18,13 +20,21 @@ interface RequestWithUser {
   };
 }
 
+interface ProductImageFile {
+  buffer: Buffer;
+  originalname: string;
+  mimetype: string;
+  size: number;
+}
+
 @Controller("admin/shop")
 @UseGuards(SupabaseTokenGuard, AdminRoleGuard)
 export class AdminShopController {
   constructor(
     private readonly shopService: ShopService,
     private readonly shopOrderLogisticsBridgeService: ShopOrderLogisticsBridgeService,
-    private readonly auditLogService: AuditLogService
+    private readonly auditLogService: AuditLogService,
+    private readonly productImageUploadService: ProductImageUploadService
   ) {}
 
   @Get("products")
@@ -35,6 +45,20 @@ export class AdminShopController {
   @Get("products/:id")
   getProduct(@Param("id") id: string): Promise<Product> {
     return this.shopService.getAdminProduct(id);
+  }
+
+  @Post("product-images")
+  @UseInterceptors(FileInterceptor("file", { limits: { fileSize: 2_000_000 } }))
+  uploadProductImage(@UploadedFile() file?: ProductImageFile) {
+    if (!file) {
+      throw new BadRequestException("Product image file is required.");
+    }
+
+    return this.productImageUploadService.uploadProductImage({
+      bytes: file.buffer,
+      fileName: file.originalname,
+      mimeType: file.mimetype
+    });
   }
 
   @Post("products")

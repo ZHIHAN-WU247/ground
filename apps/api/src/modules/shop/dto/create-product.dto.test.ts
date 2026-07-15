@@ -31,6 +31,33 @@ const run = async () => {
   });
 
   assert.deepEqual(errors, []);
+
+  const urlInput = plainToInstance(CreateProductDto, {
+    slug: "url-product",
+    name: "URL product",
+    summary: "Product with uploaded image URLs",
+    description: "Product description",
+    imageUrl: "https://cdn.example.com/product-images/cover.webp",
+    galleryImageUrls: ["https://cdn.example.com/product-images/detail.webp"],
+    isPublished: true,
+    categorySlug: "accessories",
+    category: "Accessories",
+    detailSections: [
+      {
+        title: "Material",
+        body: "Durable cotton canvas",
+        imageUrl: "https://cdn.example.com/product-images/material.webp"
+      }
+    ],
+    skus: [{ model: "Default", size: "One size", price: 20, currency: "USD", stockLabel: "In stock" }]
+  });
+
+  const urlErrors = await validate(urlInput, {
+    forbidNonWhitelisted: true,
+    whitelist: true
+  });
+
+  assert.deepEqual(urlErrors, []);
 };
 
 void run();

@@ -7,11 +7,12 @@ import { AdminShopController } from "./admin-shop.controller";
 import { ShopController } from "./shop.controller";
 import { ShopOrderLogisticsBridgeService } from "./shop-order-logistics-bridge.service";
 import { ShopService } from "./shop.service";
+import { ProductImageUploadService } from "./product-image-upload.service";
 
 @Module({
   imports: [AuditLogModule, AuthModule, DatabaseModule, LogisticsModule],
   controllers: [ShopController, AdminShopController],
-  providers: [ShopService, ShopOrderLogisticsBridgeService],
+  providers: [ShopService, ShopOrderLogisticsBridgeService, ProductImageUploadService],
   exports: [ShopService]
 })
 export class ShopModule {}

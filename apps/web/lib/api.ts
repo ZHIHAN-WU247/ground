@@ -12,6 +12,13 @@ interface RequestOptions {
   skipAuth?: boolean;
 }
 
+interface FormDataRequestOptions {
+  body: FormData;
+  headers?: HeadersInit;
+  method?: "POST";
+  skipAuth?: boolean;
+}
+
 async function requestJson<TResponse>(path: string, options: RequestOptions = {}): Promise<TResponse> {
   const headers = mergeHeaders(options.skipAuth ? undefined : getAuthRequestHeaders(), options.headers);
   const requestInit: RequestInit = {
@@ -20,6 +27,22 @@ async function requestJson<TResponse>(path: string, options: RequestOptions = {}
     ...(options.body ? { body: JSON.stringify(options.body) } : {})
   };
   const response = await fetch(`${getApiBaseUrl()}${path}`, requestInit);
+  const responseText = await response.text();
+
+  if (!response.ok) {
+    throw new Error(getErrorMessage(response.status, responseText));
+  }
+
+  return (responseText ? JSON.parse(responseText) : {}) as TResponse;
+}
+
+async function requestFormDataJson<TResponse>(path: string, options: FormDataRequestOptions): Promise<TResponse> {
+  const headers = mergeHeaders(options.skipAuth ? undefined : getAuthRequestHeaders(), options.headers);
+  const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    method: options.method ?? "POST",
+    ...(headers ? { headers } : {}),
+    body: options.body
+  });
   const responseText = await response.text();
 
   if (!response.ok) {
@@ -162,6 +185,15 @@ export async function deleteAdminJson<TResponse>(path: string): Promise<TRespons
   return requestJson<TResponse>(path, {
     method: "DELETE",
     headers: getAdminRequestHeaders(),
+    skipAuth: true
+  });
+}
+
+export async function postAdminFormData<TResponse>(path: string, body: FormData): Promise<TResponse> {
+  return requestFormDataJson<TResponse>(path, {
+    method: "POST",
+    headers: getAdminRequestHeaders(),
+    body,
     skipAuth: true
   });
 }

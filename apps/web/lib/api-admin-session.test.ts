@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 
-import { getAdminJson } from "./api";
+import { getAdminJson, postAdminFormData } from "./api";
 import { clearSupabaseAuthSession, saveSupabaseAuthSession } from "./supabase-auth";
 
 class MemoryLocalStorage {
@@ -75,6 +75,24 @@ async function main() {
     "x-ground-dev-admin": "true",
     "x-ground-dev-admin-email": "admin@example.com"
   });
+
+  let capturedBody: BodyInit | null | undefined;
+  globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+    capturedHeaders = init?.headers;
+    capturedBody = init?.body;
+    return new Response("{}");
+  }) as typeof fetch;
+
+  const formData = new FormData();
+  formData.set("file", new Blob(["image"], { type: "image/webp" }), "image.webp");
+  await postAdminFormData("/admin/shop/product-images", formData);
+  assert.equal(capturedBody, formData);
+  assert.deepEqual(capturedHeaders, {
+    Authorization: `Bearer ${makeToken("admin")}`,
+    "x-ground-dev-admin": "true",
+    "x-ground-dev-admin-email": "admin@example.com"
+  });
+  assert.equal(Object.prototype.hasOwnProperty.call(capturedHeaders as Record<string, string>, "Content-Type"), false);
 
   clearSupabaseAuthSession();
 
