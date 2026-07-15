@@ -10,6 +10,8 @@ import { defaultLogisticsPricingRouteConfigs, type LogisticsPricingRouteConfig }
 
 class StubCdekCarrierProvider extends CdekCarrierProvider {
   override async calculateQuote(input: Parameters<CdekCarrierProvider["calculateQuote"]>[0]) {
+    const chargeableWeightKg = input.weightKg < 1 ? input.weightKg : 14.11;
+
     return {
       id: "quote-cdek-1",
       cargoType: "B2C" as const,
@@ -18,7 +20,7 @@ class StubCdekCarrierProvider extends CdekCarrierProvider {
       deliveryMethod: input.deliveryMethod ?? "TO_DOOR" as const,
       actualWeightKg: 6.5,
       volumetricWeightKg: 7.06,
-      chargeableWeightKg: 14.11,
+      chargeableWeightKg,
       amount: 320,
       firstMileAmount: 0,
       lastMileAmount: 320,
@@ -192,6 +194,34 @@ const run = async () => {
       { routeId: "air-cdek", firstMileAmount: 1740, lastMileAmount: 32, totalAmount: 1772, currency: "CNY" },
       { routeId: "land-cdek", firstMileAmount: 580, lastMileAmount: 32, totalAmount: 612, currency: "CNY" },
       { routeId: "land-russia-post", firstMileAmount: 797.5, lastMileAmount: 0, totalAmount: 797.5, currency: "CNY" }
+    ]
+  );
+
+  const lightPricedQuote = await customPricingService.createQuote({
+    cargoType: "B2C" as const,
+    destinationCountry: "Russia",
+    destinationCity: "Moscow",
+    deliveryMethod: "TO_DOOR",
+    currency: "CNY",
+    weightKg: 0.4,
+    lengthCm: 10,
+    widthCm: 10,
+    heightCm: 10,
+    packageCount: 1
+  });
+
+  assert.deepEqual(
+    lightPricedQuote.routePrices?.filter((route) => ["air-cdek", "land-cdek", "land-russia-post"].includes(route.routeId)).map((route) => ({
+      routeId: route.routeId,
+      firstMileAmount: route.firstMileAmount,
+      lastMileAmount: route.lastMileAmount,
+      totalAmount: route.totalAmount,
+      currency: route.currency
+    })),
+    [
+      { routeId: "air-cdek", firstMileAmount: 120, lastMileAmount: 32, totalAmount: 152, currency: "CNY" },
+      { routeId: "land-cdek", firstMileAmount: 40, lastMileAmount: 32, totalAmount: 72, currency: "CNY" },
+      { routeId: "land-russia-post", firstMileAmount: 55, lastMileAmount: 0, totalAmount: 55, currency: "CNY" }
     ]
   );
 

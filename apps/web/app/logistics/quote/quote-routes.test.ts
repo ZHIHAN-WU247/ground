@@ -43,7 +43,7 @@ const lightQuote: LogisticsQuote = { ...baseQuote, chargeableWeightKg: 0.4 };
 const lightRoutes = buildQuoteRoutePrices(lightQuote);
 assert.deepEqual(
   lightRoutes.map((route) => `${route.amount} ${route.currency}`),
-  ["185 CNY", "97.27 CNY", "69.77 CNY", "27.5 CNY"]
+  ["185 CNY", "142.27 CNY", "87.27 CNY", "55 CNY"]
 );
 
 const routeConfigsWithUsdCdekCurrency = defaultLogisticsPricingRouteConfigs.map((config) =>
@@ -52,7 +52,7 @@ const routeConfigsWithUsdCdekCurrency = defaultLogisticsPricingRouteConfigs.map(
 const cnyRoutePrices = buildQuoteRoutePrices(lightQuote, routeConfigsWithUsdCdekCurrency);
 assert.deepEqual(
   cnyRoutePrices.map((route) => `${route.amount} ${route.currency}`),
-  ["185 CNY", "97.27 CNY", "69.77 CNY", "27.5 CNY"]
+  ["185 CNY", "142.27 CNY", "87.27 CNY", "55 CNY"]
 );
 
 const fiveKgQuote: LogisticsQuote = {

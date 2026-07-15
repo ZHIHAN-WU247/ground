@@ -67,16 +67,24 @@ export function selectQuoteRoutePrice(
 }
 
 function calculateRouteAmount(config: LogisticsPricingRouteConfig, weightKg: number, lastMileAmount: number, lastMileCurrency: CurrencyCode) {
+  const billableWeightKg = getRouteBillableWeightKg(weightKg, config);
+
   if (config.formula === "half_kg_step") {
-    return calculateHalfKgStepAmount(weightKg, config);
+    return calculateHalfKgStepAmount(billableWeightKg, config);
   }
 
   if (config.formula === "cdek_first_last_mile") {
     const cdekLastMileCny = convertToCny(lastMileAmount, lastMileCurrency, config.rubPerCny ?? 11);
-    return calculateCdekRouteAmount(weightKg, config.firstMileCnyPerKg ?? 0, config.halfKgUnit, cdekLastMileCny);
+    return calculateCdekRouteAmount(billableWeightKg, config.firstMileCnyPerKg ?? 0, config.halfKgUnit, cdekLastMileCny);
   }
 
-  return calculatePerKgAmount(weightKg, config);
+  return calculatePerKgAmount(billableWeightKg, config);
+}
+
+function getRouteBillableWeightKg(weightKg: number, config: LogisticsPricingRouteConfig) {
+  return config.routeId === "air-cdek" || config.routeId === "land-cdek" || config.routeId === "land-russia-post"
+    ? Math.max(1, weightKg)
+    : weightKg;
 }
 
 function convertToCny(amount: number, currency: CurrencyCode, rubPerCny: number) {

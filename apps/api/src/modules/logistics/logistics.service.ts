@@ -658,16 +658,24 @@ export class LogisticsService {
   }
 
   private calculateFirstMileAmount(weightKg: number, config: LogisticsPricingRouteConfig) {
+    const billableWeightKg = this.getRouteBillableWeightKg(weightKg, config);
+
     if (config.formula === "half_kg_step") {
-      const units = this.getBillableHalfKgUnits(weightKg, config.halfKgUnit);
+      const units = this.getBillableHalfKgUnits(billableWeightKg, config.halfKgUnit);
       return this.roundMoney((config.baseAmount ?? 0) + (units - 1) * (config.stepAmount ?? 0));
     }
 
     if (config.formula === "per_kg") {
-      return this.roundMoney(this.getBillableHalfKgUnits(weightKg, config.halfKgUnit) * config.halfKgUnit * (config.perKgAmount ?? 0));
+      return this.roundMoney(this.getBillableHalfKgUnits(billableWeightKg, config.halfKgUnit) * config.halfKgUnit * (config.perKgAmount ?? 0));
     }
 
-    return this.roundMoney(this.getBillableHalfKgUnits(weightKg, config.halfKgUnit) * config.halfKgUnit * (config.firstMileCnyPerKg ?? 0));
+    return this.roundMoney(this.getBillableHalfKgUnits(billableWeightKg, config.halfKgUnit) * config.halfKgUnit * (config.firstMileCnyPerKg ?? 0));
+  }
+
+  private getRouteBillableWeightKg(weightKg: number, config: LogisticsPricingRouteConfig) {
+    return config.routeId === "air-cdek" || config.routeId === "land-cdek" || config.routeId === "land-russia-post"
+      ? Math.max(1, weightKg)
+      : weightKg;
   }
 
   private getBillableHalfKgUnits(weightKg: number, halfKgUnit: number) {
