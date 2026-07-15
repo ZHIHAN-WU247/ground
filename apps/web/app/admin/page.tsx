@@ -4,7 +4,8 @@ import { T } from "../../components/I18nProvider";
 const modules = [
   { href: "/admin/logistics/orders", titleKey: "admin.module.logistics.title", bodyKey: "admin.module.logistics.body" },
   { href: "/admin/shop/orders", titleKey: "admin.module.shop.title", bodyKey: "admin.module.shop.body" },
-  { href: "/admin/customers/recipients", titleKey: "admin.module.customers.title", bodyKey: "admin.module.customers.body" }
+  { href: "/admin/customers/recipients", titleKey: "admin.module.customers.title", bodyKey: "admin.module.customers.body" },
+  { href: "/admin/logistics/pricing", titleKey: "admin.module.pricing.title", bodyKey: "admin.module.pricing.body" }
 ];
 
 export default function AdminPage() {

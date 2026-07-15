@@ -1269,6 +1269,10 @@ body:has(.logistics-home) {
   background: #6d5ce7;
 }
 
+.admin-home-card:nth-child(4)::before {
+  background: #d97706;
+}
+
 .admin-home-card h3 {
   font-size: clamp(1.65rem, 2.5vw, 2.15rem);
 }
