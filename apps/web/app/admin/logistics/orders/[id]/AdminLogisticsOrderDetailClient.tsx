@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { FileText, RadioTower, RefreshCw, ShieldCheck } from "lucide-react";
-import type { LogisticsOrder } from "@ground/shared";
+import type { LogisticsOrder, LogisticsStatus } from "@ground/shared";
 import { StatusBadge } from "../../../../../components/StatusBadge";
 import { TrackingTimeline } from "../../../../../components/TrackingTimeline";
 import { useI18n } from "../../../../../components/I18nProvider";
@@ -22,6 +22,27 @@ interface ManualTrackingState {
   carrierReferenceNo: string;
 }
 
+type ManualTrackingEventStatus = Extract<
+  LogisticsStatus,
+  | "ACCEPTED"
+  | "TRANSFER_TO_HUB"
+  | "DISPATCHED"
+  | "IN_TRANSIT"
+  | "ARRIVED_CUSTOMS_WAREHOUSE"
+  | "CUSTOMS_CLEARANCE"
+  | "CUSTOMS_RELEASED"
+  | "OUT_FOR_DELIVERY"
+  | "DELIVERED"
+  | "EXCEPTION"
+>;
+
+interface ManualTrackingEventState {
+  status: ManualTrackingEventStatus;
+  title: string;
+  description: string;
+  location: string;
+}
+
 const initialReviewForm: ReviewFormState = {
   correctedWeightKg: "",
   correctedLengthCm: "",
@@ -36,11 +57,75 @@ const initialManualTrackingState: ManualTrackingState = {
   carrierReferenceNo: ""
 };
 
+const manualTrackingEventStatuses: ManualTrackingEventStatus[] = [
+  "ACCEPTED",
+  "TRANSFER_TO_HUB",
+  "DISPATCHED",
+  "IN_TRANSIT",
+  "ARRIVED_CUSTOMS_WAREHOUSE",
+  "CUSTOMS_CLEARANCE",
+  "CUSTOMS_RELEASED",
+  "OUT_FOR_DELIVERY",
+  "DELIVERED",
+  "EXCEPTION"
+];
+
+const manualTrackingEventTemplates: Record<ManualTrackingEventStatus, Pick<ManualTrackingEventState, "title" | "description">> = {
+  ACCEPTED: {
+    title: "货物接收",
+    description: "仓库已接收货物，等待后续转运处理。"
+  },
+  TRANSFER_TO_HUB: {
+    title: "转运至中转仓",
+    description: "货物已安排转运至中转仓。"
+  },
+  DISPATCHED: {
+    title: "货物已发出",
+    description: "货物已从始发仓发出，进入运输流程。"
+  },
+  IN_TRANSIT: {
+    title: "运输中",
+    description: "货物正在运输途中。"
+  },
+  ARRIVED_CUSTOMS_WAREHOUSE: {
+    title: "到达目的国海关仓库",
+    description: "货物已到达目的国海关仓库，等待清关处理。"
+  },
+  CUSTOMS_CLEARANCE: {
+    title: "清关中",
+    description: "货物正在进行海关清关。"
+  },
+  CUSTOMS_RELEASED: {
+    title: "清关完成",
+    description: "货物已完成清关，等待尾程派送。"
+  },
+  OUT_FOR_DELIVERY: {
+    title: "尾程派送",
+    description: "货物已进入尾程派送阶段。"
+  },
+  DELIVERED: {
+    title: "签收",
+    description: "货物已完成签收。"
+  },
+  EXCEPTION: {
+    title: "异常",
+    description: "货物履约出现异常，请运营跟进处理。"
+  }
+};
+
+const buildInitialTrackingEvent = (location = ""): ManualTrackingEventState => ({
+  status: "ACCEPTED",
+  title: manualTrackingEventTemplates.ACCEPTED.title,
+  description: manualTrackingEventTemplates.ACCEPTED.description,
+  location
+});
+
 export function AdminLogisticsOrderDetailClient({ id }: { id: string }) {
   const { t } = useI18n();
   const [order, setOrder] = useState<LogisticsOrder | null>(null);
   const [reviewForm, setReviewForm] = useState<ReviewFormState>(initialReviewForm);
   const [manualTracking, setManualTracking] = useState<ManualTrackingState>(initialManualTrackingState);
+  const [manualTrackingEvent, setManualTrackingEvent] = useState<ManualTrackingEventState>(buildInitialTrackingEvent());
   const [isLoading, setIsLoading] = useState(true);
   const [activeAction, setActiveAction] = useState("");
   const [handshakeMessage, setHandshakeMessage] = useState("");
@@ -80,6 +165,10 @@ export function AdminLogisticsOrderDetailClient({ id }: { id: string }) {
         trackingNo: result.trackingNo ?? "",
         carrierReferenceNo: result.carrierReferenceNo ?? ""
       });
+      setManualTrackingEvent((current) => ({
+        ...current,
+        location: current.location.trim() || result.sender.city || "Operations"
+      }));
       setMessage("");
       setIsError(false);
     } catch (caught) {
@@ -113,6 +202,22 @@ export function AdminLogisticsOrderDetailClient({ id }: { id: string }) {
 
   const updateManualField = (field: keyof ManualTrackingState, value: string) => {
     setManualTracking((current) => ({ ...current, [field]: value }));
+  };
+
+  const updateManualTrackingEventField = (field: keyof ManualTrackingEventState, value: string) => {
+    if (field === "status") {
+      const status = value as ManualTrackingEventStatus;
+      const template = manualTrackingEventTemplates[status];
+      setManualTrackingEvent((current) => ({
+        ...current,
+        status,
+        title: template.title,
+        description: template.description
+      }));
+      return;
+    }
+
+    setManualTrackingEvent((current) => ({ ...current, [field]: value }));
   };
 
   const parseOptionalPositiveNumber = (value: string) => {
@@ -164,6 +269,41 @@ export function AdminLogisticsOrderDetailClient({ id }: { id: string }) {
     } finally {
       setActiveAction("");
     }
+  };
+
+  const submitManualTrackingEvent = () => {
+    if (!order) {
+      return;
+    }
+
+    const payload = {
+      status: manualTrackingEvent.status,
+      title: manualTrackingEvent.title.trim(),
+      description: manualTrackingEvent.description.trim(),
+      location: manualTrackingEvent.location.trim()
+    };
+
+    if (!payload.status || !payload.title || !payload.description || !payload.location) {
+      setMessage("请完整填写节点状态、标题、描述和位置。");
+      setIsError(true);
+      return;
+    }
+
+    void runAction(
+      "tracking-event",
+      async () => {
+        const result = await postAdminJson<LogisticsOrder, typeof payload>(`/admin/logistics/orders/${order.id}/tracking-events`, payload);
+        setManualTrackingEvent((current) => ({
+          ...current,
+          location: result.sender.city || current.location || "Operations"
+        }));
+        return result;
+      },
+      () => ({
+        isError: false,
+        message: "轨迹节点已新增。"
+      })
+    );
   };
 
   const runHandshake = async () => {
@@ -495,6 +635,53 @@ export function AdminLogisticsOrderDetailClient({ id }: { id: string }) {
         <div className="panel">
           <h3>{t("admin.logistics.detail.opsTracking")}</h3>
           <p className="muted">{t("admin.logistics.detail.opsTrackingNote")}</p>
+          <div className="form-grid">
+            <div className="field">
+              <label htmlFor="manualTrackingEventStatus">节点状态</label>
+              <select
+                id="manualTrackingEventStatus"
+                value={manualTrackingEvent.status}
+                onChange={(event) => updateManualTrackingEventField("status", event.target.value)}
+              >
+                {manualTrackingEventStatuses.map((status) => (
+                  <option key={status} value={status}>
+                    {t(`status.${status}`)}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="field">
+              <label htmlFor="manualTrackingEventTitle">标题</label>
+              <input
+                id="manualTrackingEventTitle"
+                value={manualTrackingEvent.title}
+                onChange={(event) => updateManualTrackingEventField("title", event.target.value)}
+              />
+            </div>
+            <div className="field">
+              <label htmlFor="manualTrackingEventLocation">位置</label>
+              <input
+                id="manualTrackingEventLocation"
+                value={manualTrackingEvent.location}
+                onChange={(event) => updateManualTrackingEventField("location", event.target.value)}
+                placeholder="Operations"
+              />
+            </div>
+            <div className="field full">
+              <label htmlFor="manualTrackingEventDescription">描述</label>
+              <textarea
+                id="manualTrackingEventDescription"
+                rows={3}
+                value={manualTrackingEvent.description}
+                onChange={(event) => updateManualTrackingEventField("description", event.target.value)}
+              />
+            </div>
+          </div>
+          <div className="button-row">
+            <button className="button primary" type="button" disabled={activeAction !== ""} onClick={submitManualTrackingEvent}>
+              {activeAction === "tracking-event" ? t("common.submitting") : "新增轨迹节点"}
+            </button>
+          </div>
           <TrackingTimeline events={order.events} />
         </div>
       </div>
