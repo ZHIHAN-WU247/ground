@@ -654,7 +654,7 @@ export class LogisticsService {
             ? await this.cdekCarrierProvider.calculateQuote({
                 ...input,
                 routeId: config.routeId,
-                deliveryMethod: config.deliveryMethod
+                deliveryMethod: input.deliveryMethod ?? config.deliveryMethod
               })
             : quote;
         const routeCdekLastMileAmount = routeQuote === quote ? cdekLastMileAmount : routeQuote.totalAmount ?? routeQuote.amount;

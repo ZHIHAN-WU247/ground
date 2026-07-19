@@ -12,7 +12,7 @@ class StubCdekCarrierProvider extends CdekCarrierProvider {
   override async calculateQuote(input: Parameters<CdekCarrierProvider["calculateQuote"]>[0]) {
     const chargeableWeightKg = input.weightKg < 1 ? input.weightKg : 14.11;
     const routeId = (input as { routeId?: string }).routeId;
-    const lastMileAmount = routeId === "land-cdek" ? 550 : 320;
+    const lastMileAmount = routeId === "land-cdek" ? (input.deliveryMethod === "TO_WAREHOUSE" ? 440 : 550) : 320;
 
     return {
       id: "quote-cdek-1",
@@ -226,6 +226,24 @@ const run = async () => {
       { routeId: "land-russia-post", firstMileAmount: 55, lastMileAmount: 0, totalAmount: 55, currency: "CNY" }
     ]
   );
+
+  const warehousePricedQuote = await customPricingService.createQuote({
+    cargoType: "B2C" as const,
+    destinationCountry: "Russia",
+    destinationCity: "Moscow",
+    deliveryMethod: "TO_WAREHOUSE",
+    currency: "CNY",
+    weightKg: 0.4,
+    lengthCm: 10,
+    widthCm: 10,
+    heightCm: 10,
+    packageCount: 1
+  });
+
+  const landDoorRoute = lightPricedQuote.routePrices?.find((route) => route.routeId === "land-cdek");
+  const landWarehouseRoute = warehousePricedQuote.routePrices?.find((route) => route.routeId === "land-cdek");
+  assert.equal(landDoorRoute?.lastMileAmount, 55);
+  assert.equal(landWarehouseRoute?.lastMileAmount, 44);
 
   const createOrderInput = {
     ownerEmail: "Customer@Example.com",
