@@ -83,6 +83,27 @@ const payloadWithDefaultTariff = (provider as unknown as {
   buildOrderPayload: (order: LogisticsOrder) => Record<string, unknown>;
 }).buildOrderPayload(sampleOrderWithoutTariff);
 assert.equal(payloadWithDefaultTariff.tariff_code, 137);
+const landCdekOrderPayload = (provider as unknown as {
+  buildOrderPayload: (order: LogisticsOrder) => Record<string, unknown>;
+}).buildOrderPayload({
+  ...sampleOrderWithoutTariff,
+  routeId: "land-cdek",
+  deliveryMethod: "TO_WAREHOUSE"
+});
+assert.equal((landCdekOrderPayload.from_location as Record<string, unknown>).region, "Primorsky Krai");
+assert.equal((landCdekOrderPayload.from_location as Record<string, unknown>).city, "Ussuriysk");
+assert.equal((landCdekOrderPayload.from_location as Record<string, unknown>).postal_code, "692500");
+assert.equal((landCdekOrderPayload.from_location as Record<string, unknown>).address, "Ussuriysk");
+assert.equal((landCdekOrderPayload.from_location as Record<string, unknown>).code, 955);
+assert.equal(landCdekOrderPayload.tariff_code, 234);
+const landCdekDoorOrderPayload = (provider as unknown as {
+  buildOrderPayload: (order: LogisticsOrder) => Record<string, unknown>;
+}).buildOrderPayload({
+  ...sampleOrderWithoutTariff,
+  routeId: "land-cdek",
+  deliveryMethod: "TO_DOOR"
+});
+assert.equal(landCdekDoorOrderPayload.tariff_code, 233);
 const warehouseOrderPayload = (provider as unknown as {
   buildOrderPayload: (order: LogisticsOrder, options?: { shipmentPointCode?: string; deliveryPointCode?: string }) => Record<string, unknown>;
 }).buildOrderPayload({
@@ -104,6 +125,7 @@ const bEndOrderPayload = (provider as unknown as {
 assert.equal(bEndOrderPayload.tariff_code, 139);
 const calculatorPayload = (provider as unknown as {
   buildCalculatorPayload: (input: {
+    routeId?: "air-cdek" | "land-cdek";
     cargoType: "B2C";
     destinationCountry: "Russia";
     destinationCity: string;
@@ -132,6 +154,74 @@ assert.equal(calculatorPayload.tariff_code, 137);
 assert.equal((calculatorPayload.from_location as Record<string, unknown>).code, 44);
 assert.equal((calculatorPayload.to_location as Record<string, unknown>).code, 137);
 assert.equal((calculatorPayload.packages as unknown[]).length, 2);
+
+const landCdekCalculatorPayload = (provider as unknown as {
+  buildCalculatorPayload: (input: {
+    routeId: "land-cdek";
+    cargoType: "B2C";
+    destinationCountry: "Russia";
+    destinationCity: string;
+    deliveryMethod: "TO_WAREHOUSE";
+    currency: "CNY";
+    weightKg: number;
+    lengthCm: number;
+    widthCm: number;
+    heightCm: number;
+    packageCount: number;
+    destinationLocationCode?: string;
+  }) => Record<string, unknown>;
+}).buildCalculatorPayload({
+  routeId: "land-cdek",
+  cargoType: "B2C",
+  destinationCountry: "Russia",
+  destinationCity: "Saint Petersburg",
+  deliveryMethod: "TO_WAREHOUSE",
+  currency: "CNY",
+  weightKg: 1,
+  lengthCm: 10,
+  widthCm: 10,
+  heightCm: 10,
+  packageCount: 1,
+  destinationLocationCode: "137"
+});
+assert.equal((landCdekCalculatorPayload.from_location as Record<string, unknown>).region, "Primorsky Krai");
+assert.equal((landCdekCalculatorPayload.from_location as Record<string, unknown>).city, "Ussuriysk");
+assert.equal((landCdekCalculatorPayload.from_location as Record<string, unknown>).postal_code, "692500");
+assert.equal((landCdekCalculatorPayload.from_location as Record<string, unknown>).address, "Ussuriysk");
+assert.equal((landCdekCalculatorPayload.from_location as Record<string, unknown>).code, 955);
+assert.equal("fias_guid" in (landCdekCalculatorPayload.from_location as Record<string, unknown>), false);
+assert.equal(landCdekCalculatorPayload.tariff_code, 234);
+
+const landCdekDoorCalculatorPayload = (provider as unknown as {
+  buildCalculatorPayload: (input: {
+    routeId: "land-cdek";
+    cargoType: "B2C";
+    destinationCountry: "Russia";
+    destinationCity: string;
+    deliveryMethod: "TO_DOOR";
+    currency: "CNY";
+    weightKg: number;
+    lengthCm: number;
+    widthCm: number;
+    heightCm: number;
+    packageCount: number;
+    destinationLocationCode?: string;
+  }) => Record<string, unknown>;
+}).buildCalculatorPayload({
+  routeId: "land-cdek",
+  cargoType: "B2C",
+  destinationCountry: "Russia",
+  destinationCity: "Saint Petersburg",
+  deliveryMethod: "TO_DOOR",
+  currency: "CNY",
+  weightKg: 1,
+  lengthCm: 10,
+  widthCm: 10,
+  heightCm: 10,
+  packageCount: 1,
+  destinationLocationCode: "137"
+});
+assert.equal(landCdekDoorCalculatorPayload.tariff_code, 233);
 
 const cEndWarehouseToDoorPayload = (provider as unknown as {
   buildCalculatorPayload: (input: {
@@ -271,6 +361,18 @@ const run = async () => {
   const createOrderPayload = createOrderCall?.options.body as Record<string, unknown>;
   assert.equal(createOrderPayload.shipment_point, "SPB42");
   assert.equal(createOrderPayload.delivery_point, "SPB42");
+
+  numericTrackingCalls.length = 0;
+  await numericTrackingProvider.createOrder({
+    ...sampleOrderWithoutTariff,
+    routeId: "land-cdek",
+    deliveryMethod: "TO_WAREHOUSE"
+  });
+  const landCdekCreateOrderCall = numericTrackingCalls.find((call) => call.path === "/v2/orders");
+  const landCdekCreateOrderPayload = landCdekCreateOrderCall?.options.body as Record<string, unknown>;
+  assert.equal(landCdekCreateOrderPayload.tariff_code, 234);
+  assert.equal(landCdekCreateOrderPayload.shipment_point, "SPB42");
+  assert.equal(landCdekCreateOrderPayload.delivery_point, "SPB42");
 
   const quoteProvider = new CdekCarrierProvider() as unknown as {
     calculateQuote: (input: {

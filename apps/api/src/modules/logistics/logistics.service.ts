@@ -60,6 +60,14 @@ export class LogisticsService {
     locationCode: "44",
     fiasGuid: "c2deb16a-0330-4f05-821f-1d09c93331e6"
   } as const;
+  private readonly cdekLandOriginLocation = {
+    country: "Russia",
+    province: "Primorsky Krai",
+    city: "Ussuriysk",
+    postalCode: "692500",
+    addressLine: "Ussuriysk",
+    locationCode: "955"
+  } as const;
 
   constructor(
     private readonly carrierProvider: FixedCarrierProvider,
@@ -175,14 +183,14 @@ export class LogisticsService {
 
     return {
       ...quote,
-      routePrices: this.buildRouteQuotePrices(quote, await this.listPricingRouteConfigs())
+      routePrices: await this.buildRouteQuotePrices(input, quote, await this.listPricingRouteConfigs())
     };
   }
 
   async createOrder(input: CreateLogisticsOrderDto): Promise<LogisticsOrder> {
     const routeId = input.routeId ?? "air-cdek";
     const { id, orderNo } = this.generateOrderIdentity(routeId);
-    const sender = this.normalizeCdekSenderOrigin(input.sender);
+    const sender = this.normalizeCdekSenderOrigin(input.sender, routeId);
     const cargoItems = this.normalizeCargoItems(input);
     const hasCargoItems = cargoItems.length > 0;
     const goodsName = hasCargoItems ? cargoItems.map((item) => item.name).join(", ") : input.goodsName?.trim();
@@ -553,10 +561,10 @@ export class LogisticsService {
     return ownerEmail?.trim().toLowerCase() || undefined;
   }
 
-  private normalizeCdekSenderOrigin(sender: LogisticsOrder["sender"]): LogisticsOrder["sender"] {
+  private normalizeCdekSenderOrigin(sender: LogisticsOrder["sender"], routeId?: LogisticsRouteId): LogisticsOrder["sender"] {
     return {
       ...sender,
-      ...this.cdekOriginLocation
+      ...(routeId === "land-cdek" ? this.cdekLandOriginLocation : this.cdekOriginLocation)
     };
   }
 
@@ -633,15 +641,26 @@ export class LogisticsService {
     return this.toQuoteSnapshot(quote, input.routeId);
   }
 
-  private buildRouteQuotePrices(quote: LogisticsQuote, configs: LogisticsPricingRouteConfig[]): LogisticsRouteQuotePrice[] {
+  private async buildRouteQuotePrices(input: LogisticsQuoteRequest, quote: LogisticsQuote, configs: LogisticsPricingRouteConfig[]): Promise<LogisticsRouteQuotePrice[]> {
     const cdekLastMileAmount = quote.totalAmount ?? quote.amount;
-    return configs
+    const activeConfigs = configs
       .filter((config) => config.cargoType === "B2C" && config.isActive)
-      .sort((current, next) => current.sortOrder - next.sortOrder)
-      .map((config) => {
+      .sort((current, next) => current.sortOrder - next.sortOrder);
+
+    return Promise.all(
+      activeConfigs.map(async (config) => {
+        const routeQuote =
+          config.routeId === "land-cdek" && config.formula === "cdek_first_last_mile"
+            ? await this.cdekCarrierProvider.calculateQuote({
+                ...input,
+                routeId: config.routeId,
+                deliveryMethod: config.deliveryMethod
+              })
+            : quote;
+        const routeCdekLastMileAmount = routeQuote === quote ? cdekLastMileAmount : routeQuote.totalAmount ?? routeQuote.amount;
         const lastMileAmount =
-          config.formula === "cdek_first_last_mile" ? this.convertToCny(cdekLastMileAmount, quote.currency, config.rubPerCny ?? 11) : 0;
-        const firstMileAmount = this.calculateFirstMileAmount(quote.chargeableWeightKg, config);
+          config.formula === "cdek_first_last_mile" ? this.convertToCny(routeCdekLastMileAmount, routeQuote.currency, config.rubPerCny ?? 11) : 0;
+        const firstMileAmount = this.calculateFirstMileAmount(routeQuote.chargeableWeightKg, config);
         const totalAmount = this.roundMoney(firstMileAmount + lastMileAmount);
 
         return {
@@ -654,7 +673,8 @@ export class LogisticsService {
           totalAmount,
           currency: "CNY" as const
         };
-      });
+      })
+    );
   }
 
   private calculateFirstMileAmount(weightKg: number, config: LogisticsPricingRouteConfig) {

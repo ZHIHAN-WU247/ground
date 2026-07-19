@@ -11,6 +11,8 @@ import { defaultLogisticsPricingRouteConfigs, type LogisticsPricingRouteConfig }
 class StubCdekCarrierProvider extends CdekCarrierProvider {
   override async calculateQuote(input: Parameters<CdekCarrierProvider["calculateQuote"]>[0]) {
     const chargeableWeightKg = input.weightKg < 1 ? input.weightKg : 14.11;
+    const routeId = (input as { routeId?: string }).routeId;
+    const lastMileAmount = routeId === "land-cdek" ? 550 : 320;
 
     return {
       id: "quote-cdek-1",
@@ -21,18 +23,18 @@ class StubCdekCarrierProvider extends CdekCarrierProvider {
       actualWeightKg: 6.5,
       volumetricWeightKg: 7.06,
       chargeableWeightKg,
-      amount: 320,
+      amount: lastMileAmount,
       firstMileAmount: 0,
-      lastMileAmount: 320,
-      totalAmount: 320,
+      lastMileAmount,
+      totalAmount: lastMileAmount,
       currency: "RUB" as const,
       cdekTariffCode: 139,
       cdekDeliveryMinDays: 1,
       cdekDeliveryMaxDays: 2,
       breakdown: [
         { label: "First mile amount", amount: 0 },
-        { label: "CDEK last-mile amount", amount: 320 },
-        { label: "Total amount", amount: 320 }
+        { label: "CDEK last-mile amount", amount: lastMileAmount },
+        { label: "Total amount", amount: lastMileAmount }
       ]
     };
   }
@@ -192,7 +194,7 @@ const run = async () => {
     [
       { routeId: "air-ems", firstMileAmount: 1725, lastMileAmount: 0, totalAmount: 1725, currency: "CNY" },
       { routeId: "air-cdek", firstMileAmount: 1740, lastMileAmount: 32, totalAmount: 1772, currency: "CNY" },
-      { routeId: "land-cdek", firstMileAmount: 580, lastMileAmount: 32, totalAmount: 612, currency: "CNY" },
+      { routeId: "land-cdek", firstMileAmount: 580, lastMileAmount: 55, totalAmount: 635, currency: "CNY" },
       { routeId: "land-russia-post", firstMileAmount: 797.5, lastMileAmount: 0, totalAmount: 797.5, currency: "CNY" }
     ]
   );
@@ -220,7 +222,7 @@ const run = async () => {
     })),
     [
       { routeId: "air-cdek", firstMileAmount: 120, lastMileAmount: 32, totalAmount: 152, currency: "CNY" },
-      { routeId: "land-cdek", firstMileAmount: 40, lastMileAmount: 32, totalAmount: 72, currency: "CNY" },
+      { routeId: "land-cdek", firstMileAmount: 40, lastMileAmount: 55, totalAmount: 95, currency: "CNY" },
       { routeId: "land-russia-post", firstMileAmount: 55, lastMileAmount: 0, totalAmount: 55, currency: "CNY" }
     ]
   );
@@ -329,6 +331,14 @@ const run = async () => {
 
     assert.equal(routeOrder.routeId, routeId);
     assert.match(routeOrder.orderNo, new RegExp(`^${prefix}\\d+$`));
+
+    if (routeId === "land-cdek") {
+      assert.equal(routeOrder.sender.province, "Primorsky Krai");
+      assert.equal(routeOrder.sender.city, "Ussuriysk");
+      assert.equal(routeOrder.sender.postalCode, "692500");
+      assert.equal(routeOrder.sender.addressLine, "Ussuriysk");
+      assert.equal(routeOrder.sender.locationCode, "955");
+    }
   }
 
   const directory = mkdtempSync(join(tmpdir(), "ground-logistics-orders-"));

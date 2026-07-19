@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { BadRequestException, Injectable, Optional, ServiceUnavailableException } from "@nestjs/common";
-import type { CarrierLabelStatus, CurrencyCode, LogisticsOrder, LogisticsQuote, LogisticsQuoteRequest, LogisticsStatus, TrackingEvent } from "@ground/shared";
+import type { CarrierLabelStatus, CurrencyCode, LogisticsOrder, LogisticsQuote, LogisticsQuoteRequest, LogisticsRouteId, LogisticsStatus, TrackingEvent } from "@ground/shared";
 import { CarrierConfigService } from "./carrier-config.service";
 
 interface CdekToken {
@@ -43,6 +43,7 @@ interface CdekHandshakeResult {
 }
 
 interface CdekCalculateQuoteInput extends LogisticsQuoteRequest {
+  routeId?: LogisticsRouteId;
   tariffCode?: number;
 }
 
@@ -97,6 +98,8 @@ const cdekStatusMap: Record<string, LogisticsStatus> = {
 const cdekDefaultTariffCode = 139;
 const cdekWarehouseToWarehouseTariffCode = 136;
 const cdekWarehouseToDoorTariffCode = 137;
+const cdekEconomyWarehouseToWarehouseTariffCode = 234;
+const cdekEconomyWarehouseToDoorTariffCode = 233;
 
 const cdekMoscowOrigin: Required<Pick<CdekLocationAddress, "country" | "province" | "city" | "postalCode" | "addressLine" | "locationCode" | "fiasGuid">> = {
   country: "Russia",
@@ -106,6 +109,15 @@ const cdekMoscowOrigin: Required<Pick<CdekLocationAddress, "country" | "province
   addressLine: "Tverskaya Street 1",
   locationCode: "44",
   fiasGuid: "c2deb16a-0330-4f05-821f-1d09c93331e6"
+};
+
+const cdekUssuriyskOrigin: Required<Pick<CdekLocationAddress, "country" | "province" | "city" | "postalCode" | "addressLine" | "locationCode">> = {
+  country: "Russia",
+  province: "Primorsky Krai",
+  city: "Ussuriysk",
+  postalCode: "692500",
+  addressLine: "Ussuriysk",
+  locationCode: "955"
 };
 
 @Injectable()
@@ -159,7 +171,7 @@ export class CdekCarrierProvider {
   async createOrder(order: LogisticsOrder): Promise<CdekCreateOrderResult> {
     this.assertProductionWritesEnabled();
     const tariffCode = this.resolveOrderTariffCode(order);
-    const sender = this.normalizeSenderOrigin(order.sender);
+    const sender = this.normalizeSenderOrigin(order.sender, order.routeId);
     const pointCodes = await this.resolveOrderPointCodes(order, sender, tariffCode);
 
     const response = await this.cdekFetch<Record<string, unknown>>("/v2/orders", {
@@ -428,7 +440,7 @@ export class CdekCarrierProvider {
     const packageWeightGrams = Math.max(1, Math.round(order.weightKg * 1000));
     const tariffCode = options.tariffCode ?? this.resolveOrderTariffCode(order);
     const today = new Date().toISOString().slice(0, 10);
-    const sender = this.normalizeSenderOrigin(order.sender);
+    const sender = this.normalizeSenderOrigin(order.sender, order.routeId);
     const items = this.buildOrderItems(order, packageWeightGrams, sender.country);
     const shipmentLocation = options.shipmentPointCode
       ? { shipment_point: options.shipmentPointCode }
@@ -504,6 +516,7 @@ export class CdekCarrierProvider {
 
   private buildCalculatorPayload(input: CdekCalculateQuoteInput) {
     const tariffCode = this.resolveCalculatorTariffCode(input);
+    const origin = this.resolveOrigin(input.routeId);
     const defaultDestination = this.getDefaultCdekDestination(input.destinationCountry, input.destinationCity);
     const destinationPostalCode = input.destinationPostalCode ?? defaultDestination.postalCode ?? "";
     const destinationAddressLine = input.destinationAddressLine ?? defaultDestination.addressLine ?? input.destinationCity;
@@ -525,12 +538,12 @@ export class CdekCarrierProvider {
       type: 1,
       tariff_code: tariffCode,
       from_location: {
-        country_code: this.mapCountryCode(cdekMoscowOrigin.country),
-        region: cdekMoscowOrigin.province,
-        city: cdekMoscowOrigin.city,
-        postal_code: cdekMoscowOrigin.postalCode,
-        address: cdekMoscowOrigin.addressLine,
-        ...(this.buildLocationIdentifier(cdekMoscowOrigin) ?? {})
+        country_code: this.mapCountryCode(origin.country),
+        region: origin.province,
+        city: origin.city,
+        postal_code: origin.postalCode,
+        address: origin.addressLine,
+        ...(this.buildLocationIdentifier(origin) ?? {})
       },
       to_location: {
         country_code: this.mapCountryCode(input.destinationCountry),
@@ -638,6 +651,10 @@ export class CdekCarrierProvider {
       return cdekDefaultTariffCode;
     }
 
+    if (input.routeId === "land-cdek") {
+      return input.deliveryMethod === "TO_WAREHOUSE" ? cdekEconomyWarehouseToWarehouseTariffCode : cdekEconomyWarehouseToDoorTariffCode;
+    }
+
     return input.deliveryMethod === "TO_WAREHOUSE" ? cdekWarehouseToWarehouseTariffCode : cdekWarehouseToDoorTariffCode;
   }
 
@@ -650,11 +667,15 @@ export class CdekCarrierProvider {
       return cdekDefaultTariffCode;
     }
 
+    if (order.routeId === "land-cdek") {
+      return order.deliveryMethod === "TO_WAREHOUSE" ? cdekEconomyWarehouseToWarehouseTariffCode : cdekEconomyWarehouseToDoorTariffCode;
+    }
+
     return order.deliveryMethod === "TO_WAREHOUSE" ? cdekWarehouseToWarehouseTariffCode : cdekWarehouseToDoorTariffCode;
   }
 
   private async resolveOrderPointCodes(order: LogisticsOrder, sender: CdekLocationAddress, tariffCode: number): Promise<Pick<CdekOrderPayloadOptions, "shipmentPointCode" | "deliveryPointCode">> {
-    if (tariffCode !== cdekWarehouseToWarehouseTariffCode) {
+    if (!this.isWarehouseToWarehouseTariff(tariffCode)) {
       return {};
     }
 
@@ -667,6 +688,10 @@ export class CdekCarrierProvider {
       shipmentPointCode,
       deliveryPointCode
     };
+  }
+
+  private isWarehouseToWarehouseTariff(tariffCode: number) {
+    return tariffCode === cdekWarehouseToWarehouseTariffCode || tariffCode === cdekEconomyWarehouseToWarehouseTariffCode;
   }
 
   private async resolveDeliveryPointCode(address: CdekLocationAddress, role: "sender" | "recipient") {
@@ -862,11 +887,15 @@ export class CdekCarrierProvider {
     return [address.addressLine, address.city, address.province, address.postalCode, address.country].filter(Boolean).join(", ");
   }
 
-  private normalizeSenderOrigin(sender: LogisticsOrder["sender"]): LogisticsOrder["sender"] {
+  private normalizeSenderOrigin(sender: LogisticsOrder["sender"], routeId?: LogisticsRouteId): LogisticsOrder["sender"] {
     return {
       ...sender,
-      ...cdekMoscowOrigin
+      ...this.resolveOrigin(routeId)
     };
+  }
+
+  private resolveOrigin(routeId?: LogisticsRouteId) {
+    return routeId === "land-cdek" ? cdekUssuriyskOrigin : cdekMoscowOrigin;
   }
 
   private getDefaultCdekDestination(country: string, city: string) {
