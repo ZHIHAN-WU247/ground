@@ -5,7 +5,7 @@ import { useI18n } from "../../../components/I18nProvider";
 import { getSafeAuthReturnPath } from "../../../lib/auth-redirect";
 import { hasLocalAuthAccountByAccount, hasLocalAuthAccountByEmail, registerLocalAuthAccount } from "../../../lib/local-auth";
 import { saveLocalUserProfile } from "../../../lib/local-user-profile";
-import { signUpWithSupabasePassword } from "../../../lib/supabase-auth";
+import { signInWithSupabasePassword } from "../../../lib/supabase-auth";
 import { savePersistentUserProfile } from "../../../lib/user-profile-api";
 
 const initialState = {
@@ -153,7 +153,9 @@ export function RegisterForm() {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
+          account: form.account,
           email: form.email,
+          password: form.password,
           verificationCode: form.verificationCode
         })
       });
@@ -178,7 +180,7 @@ export function RegisterForm() {
         return;
       }
 
-      await signUpWithSupabasePassword(form.email, form.password, form.account);
+      await signInWithSupabasePassword(form.email, form.password);
 
       const registerResult = registerLocalAuthAccount({
         account: form.account,
