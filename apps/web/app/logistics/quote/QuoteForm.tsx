@@ -29,7 +29,7 @@ const deliveryMethodOptions: LogisticsDeliveryMethod[] = ["TO_DOOR", "TO_WAREHOU
 const initialState: QuoteFormState = {
   cargoType: "B2C",
   destinationCountry: "Russia",
-  destinationCity: "Moscow",
+  destinationCity: "",
   destinationPostalCode: "101000",
   destinationAddressLine: "Tverskaya Street 1",
   deliveryMethod: "TO_DOOR",
@@ -120,7 +120,7 @@ export function QuoteForm() {
           </div>
           <div className="field">
             <label htmlFor="destinationCity">{t("quote.label.destinationCity")}</label>
-            <input id="destinationCity" list="quoteDestinationCities" value={form.destinationCity} onChange={(event) => updateField("destinationCity", event.target.value)} required />
+            <input id="destinationCity" list="quoteDestinationCities" value={form.destinationCity} onChange={(event) => updateField("destinationCity", event.target.value)} />
             <datalist id="quoteDestinationCities">
               {cityOptions.map((city) => <option key={city.id} value={city.name} />)}
             </datalist>
@@ -128,7 +128,7 @@ export function QuoteForm() {
           </div>
           <div className="field">
             <label htmlFor="destinationPostalCode">{t("quote.label.destinationPostalCode")}</label>
-            <input id="destinationPostalCode" value={form.destinationPostalCode} onChange={(event) => updateField("destinationPostalCode", event.target.value)} inputMode="numeric" />
+            <input id="destinationPostalCode" value={form.destinationPostalCode} onChange={(event) => updateField("destinationPostalCode", event.target.value)} inputMode="numeric" required />
             <small className="field-hint">{t("quote.hint.destinationPostalCode")}</small>
           </div>
           <div className="field full">
