@@ -425,6 +425,127 @@ const run = async () => {
   assert.equal(quote.chargeableWeightKg, 1);
   assert.equal(quote.cdekTariffCode, 136);
 
+  const landTariffListProvider = new CdekCarrierProvider() as unknown as {
+    calculateLandRouteQuote: (input: {
+      cargoType: "B2C";
+      routeId: "land-cdek";
+      destinationCountry: "Russia";
+      destinationCity: string;
+      destinationLocationCode?: string;
+      deliveryMethod: "TO_DOOR" | "TO_WAREHOUSE";
+      currency: "CNY";
+      weightKg: number;
+      lengthCm: number;
+      widthCm: number;
+      heightCm: number;
+      packageCount: number;
+    }) => Promise<{ lastMileAmount: number; totalAmount: number; currency: string; cdekTariffCode?: number; cdekDeliveryMinDays?: number; cdekDeliveryMaxDays?: number } | undefined>;
+    cdekFetch: (path: string, options: { method: "GET" | "POST"; body?: unknown }) => Promise<Record<string, unknown> | Array<Record<string, unknown>>>;
+  };
+  const landTariffListCalls: Array<{ path: string; options: { method: "GET" | "POST"; body?: unknown } }> = [];
+  landTariffListProvider.cdekFetch = async (path, options) => {
+    landTariffListCalls.push({ path, options });
+
+    if (path.startsWith("/v2/location/cities")) {
+      return [{ code: 44, city: "Moscow" }];
+    }
+
+    assert.equal(path, "/v2/calculator/tarifflist");
+    return {
+      currency: "RUB",
+      tariff_codes: [
+        { tariff_code: 233, tariff_name: "Economy package warehouse-door", delivery_sum: 780, period_min: 8, period_max: 12 },
+        { tariff_code: 137, tariff_name: "Package warehouse-door", delivery_sum: 620, period_min: 4, period_max: 7 },
+        { tariff_code: 482, tariff_name: "Express warehouse-door", delivery_sum: 510, period_min: 3, period_max: 5 },
+        { tariff_code: 483, tariff_name: "Express warehouse-warehouse", delivery_sum: 100, period_min: 3, period_max: 5 }
+      ]
+    };
+  };
+  const landDoorQuote = await landTariffListProvider.calculateLandRouteQuote({
+    cargoType: "B2C",
+    routeId: "land-cdek",
+    destinationCountry: "Russia",
+    destinationCity: "Moscow",
+    deliveryMethod: "TO_DOOR",
+    currency: "CNY",
+    weightKg: 1,
+    lengthCm: 10,
+    widthCm: 10,
+    heightCm: 10,
+    packageCount: 1
+  });
+  const landTariffListPayload = landTariffListCalls.at(-1)?.options.body as Record<string, Record<string, unknown>>;
+  assert.equal(landTariffListCalls.at(-1)?.path, "/v2/calculator/tarifflist");
+  assert.equal((landTariffListPayload.from_location as Record<string, unknown>).code, 955);
+  assert.equal((landTariffListPayload.from_location as Record<string, unknown>).city, "Ussuriysk");
+  assert.equal("tariff_code" in landTariffListPayload, false);
+  assert.equal(landDoorQuote?.lastMileAmount, 510);
+  assert.equal(landDoorQuote?.totalAmount, 510);
+  assert.equal(landDoorQuote?.currency, "RUB");
+  assert.equal(landDoorQuote?.cdekTariffCode, 482);
+  assert.equal(landDoorQuote?.cdekDeliveryMinDays, 3);
+  assert.equal(landDoorQuote?.cdekDeliveryMaxDays, 5);
+
+  landTariffListCalls.length = 0;
+  landTariffListProvider.cdekFetch = async (path, options) => {
+    landTariffListCalls.push({ path, options });
+
+    if (path.startsWith("/v2/location/cities")) {
+      return [{ code: 137, city: "Saint Petersburg" }];
+    }
+
+    return {
+      currency: "RUB",
+      tariff_codes: [
+        { tariff_code: 136, tariff_name: "Package warehouse-warehouse", delivery_sum: 430, period_min: 4, period_max: 6 },
+        { tariff_code: 137, tariff_name: "Package warehouse-door", delivery_sum: 120, period_min: 4, period_max: 6 }
+      ]
+    };
+  };
+  const landWarehouseQuote = await landTariffListProvider.calculateLandRouteQuote({
+    cargoType: "B2C",
+    routeId: "land-cdek",
+    destinationCountry: "Russia",
+    destinationCity: "Saint Petersburg",
+    deliveryMethod: "TO_WAREHOUSE",
+    currency: "CNY",
+    weightKg: 1,
+    lengthCm: 10,
+    widthCm: 10,
+    heightCm: 10,
+    packageCount: 1
+  });
+  assert.equal(landWarehouseQuote?.lastMileAmount, 430);
+  assert.equal(landWarehouseQuote?.cdekTariffCode, 136);
+
+  landTariffListProvider.cdekFetch = async (path) => {
+    if (path.startsWith("/v2/location/cities")) {
+      return [{ code: 137, city: "Saint Petersburg" }];
+    }
+
+    return {
+      currency: "RUB",
+      tariff_codes: [
+        { tariff_code: 139, tariff_name: "Disallowed default", delivery_sum: 10 },
+        { tariff_code: 483, tariff_name: "Wrong delivery method", delivery_sum: 20 }
+      ]
+    };
+  };
+  const unavailableLandQuote = await landTariffListProvider.calculateLandRouteQuote({
+    cargoType: "B2C",
+    routeId: "land-cdek",
+    destinationCountry: "Russia",
+    destinationCity: "Saint Petersburg",
+    deliveryMethod: "TO_DOOR",
+    currency: "CNY",
+    weightKg: 1,
+    lengthCm: 10,
+    widthCm: 10,
+    heightCm: 10,
+    packageCount: 1
+  });
+  assert.equal(unavailableLandQuote, undefined);
+
   const resolvingQuoteProvider = new CdekCarrierProvider() as unknown as {
     calculateQuote: (input: {
       cargoType: "B2C";
@@ -485,6 +606,105 @@ const run = async () => {
   assert.equal(cityLookupParams.get("size"), "5");
   assert.equal((resolvingCalls[1]?.options.body as { to_location: Record<string, unknown> }).to_location.code, 137);
   assert.equal((resolvingCalls[1]?.options.body as { to_location: Record<string, unknown> }).to_location.postal_code, "190000");
+
+  const postalOnlyQuoteProvider = new CdekCarrierProvider() as unknown as {
+    calculateQuote: (input: {
+      cargoType: "B2C";
+      destinationCountry: "Russia";
+      destinationCity: string;
+      destinationPostalCode: string;
+      deliveryMethod?: "TO_DOOR" | "TO_WAREHOUSE";
+      currency: "CNY";
+      weightKg: number;
+      lengthCm: number;
+      widthCm: number;
+      heightCm: number;
+      packageCount: number;
+    }) => Promise<{ cdekTariffCode?: number }>;
+    cdekFetch: (path: string, options: { method: "GET" | "POST"; body?: unknown }) => Promise<Record<string, unknown> | Array<Record<string, unknown>>>;
+  };
+  const postalOnlyCalls: Array<{ path: string; options: { method: "GET" | "POST"; body?: unknown } }> = [];
+  postalOnlyQuoteProvider.cdekFetch = async (path, options) => {
+    postalOnlyCalls.push({ path, options });
+
+    if (path.startsWith("/v2/location/cities")) {
+      const params = new URLSearchParams(path.split("?")[1] ?? "");
+
+      if (params.has("postal_code")) {
+        return [
+          { code: 433, city: "Naberezhnye Chelny", postal_code: "423601" },
+          { code: 185433, city: "Naberezhnye Chelny", postal_code: "423601" }
+        ];
+      }
+
+      return [];
+    }
+
+    return {
+      total_sum: 710,
+      delivery_sum: 710,
+      currency: "RUB",
+      weight_calc: 1000
+    };
+  };
+  await postalOnlyQuoteProvider.calculateQuote({
+    cargoType: "B2C",
+    destinationCountry: "Russia",
+    destinationCity: "hjkhsadklf",
+    destinationPostalCode: "423601",
+    deliveryMethod: "TO_DOOR",
+    currency: "CNY",
+    weightKg: 1,
+    lengthCm: 10,
+    widthCm: 10,
+    heightCm: 10,
+    packageCount: 1
+  });
+  assert.equal(postalOnlyCalls.some((call) => call.path.includes("city=hjkhsadklf")), false);
+  assert.equal((postalOnlyCalls.at(-1)?.options.body as { to_location: Record<string, unknown> }).to_location.code, 433);
+
+  const unknownPostalQuoteProvider = new CdekCarrierProvider() as unknown as {
+    calculateQuote: (input: {
+      cargoType: "B2C";
+      destinationCountry: "Russia";
+      destinationCity: string;
+      destinationPostalCode: string;
+      deliveryMethod?: "TO_DOOR" | "TO_WAREHOUSE";
+      currency: "CNY";
+      weightKg: number;
+      lengthCm: number;
+      widthCm: number;
+      heightCm: number;
+      packageCount: number;
+    }) => Promise<unknown>;
+    cdekFetch: (path: string, options: { method: "GET" | "POST"; body?: unknown }) => Promise<Array<Record<string, unknown>>>;
+  };
+  const unknownPostalCalls: Array<{ path: string; options: { method: "GET" | "POST"; body?: unknown } }> = [];
+  unknownPostalQuoteProvider.cdekFetch = async (path, options) => {
+    unknownPostalCalls.push({ path, options });
+    return [];
+  };
+  await assert.rejects(
+    () =>
+      unknownPostalQuoteProvider.calculateQuote({
+        cargoType: "B2C",
+        destinationCountry: "Russia",
+        destinationCity: "",
+        destinationPostalCode: "999999",
+        deliveryMethod: "TO_DOOR",
+        currency: "CNY",
+        weightKg: 1,
+        lengthCm: 10,
+        widthCm: 10,
+        heightCm: 10,
+        packageCount: 1
+      }),
+    {
+      message: "Destination postal code 999999 is unsupported or could not be identified by CDEK."
+    }
+  );
+  assert.equal(unknownPostalCalls.length, 1);
+  assert.equal(unknownPostalCalls[0]?.path.includes("postal_code=999999"), true);
 
   const ambiguousQuoteProvider = new CdekCarrierProvider() as unknown as {
     calculateQuote: (input: {

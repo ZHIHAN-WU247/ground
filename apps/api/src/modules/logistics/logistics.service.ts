@@ -1,6 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
-import { BadRequestException, Inject, Injectable, NotFoundException, Optional } from "@nestjs/common";
+import { BadRequestException, Inject, Injectable, NotFoundException, Optional, ServiceUnavailableException } from "@nestjs/common";
 import type {
   CargoItem,
   CurrencyCode,
@@ -175,7 +175,11 @@ export class LogisticsService {
   }
 
   async createQuote(input: LogisticsQuoteRequest): Promise<LogisticsQuote> {
-    const quote = await this.cdekCarrierProvider.calculateQuote(input);
+    if (input.cargoType !== "B2C") {
+      return this.cdekCarrierProvider.calculateQuote(input);
+    }
+
+    const quote = await this.calculateBaseB2cQuote(input);
 
     if (quote.cargoType !== "B2C") {
       return quote;
@@ -218,6 +222,7 @@ export class LogisticsService {
       : undefined;
     const ownerEmail = this.normalizeOwnerEmail(input.ownerEmail);
     await this.customerRiskGuard?.assertCanCreateOrder(ownerEmail);
+    const shouldPersistCdekTariff = (routeId === "air-cdek" || routeId === "land-cdek") && estimatedQuote?.cdekTariffCode !== undefined;
     const order: LogisticsOrder = {
       id,
       orderNo,
@@ -243,6 +248,7 @@ export class LogisticsService {
       carrierCreateState: "NOT_SUBMITTED",
       labelStatus: "NOT_REQUESTED",
       trackingSyncStatus: "NOT_STARTED",
+      ...(shouldPersistCdekTariff ? { cdekTariffCode: estimatedQuote.cdekTariffCode } : {}),
       ...(estimatedQuote ? { estimatedQuote } : {}),
       events: [
         this.createEvent("UNDER_REVIEW", "Order submitted", "Customer submitted a logistics order and is waiting for operations review.", sender.city)
@@ -638,7 +644,61 @@ export class LogisticsService {
       ...(input.recipient.fiasGuid ? { destinationFiasGuid: input.recipient.fiasGuid } : {})
     });
 
+    if (input.routeId === "land-cdek" && !quote.routePrices?.some((price) => price.routeId === input.routeId && price.cdekTariffCode !== undefined)) {
+      throw new BadRequestException("Land CDEK is unavailable for the current route. Request a new quote or choose another route.");
+    }
+
     return this.toQuoteSnapshot(quote, input.routeId);
+  }
+
+  private async calculateBaseB2cQuote(input: LogisticsQuoteRequest): Promise<LogisticsQuote> {
+    try {
+      return await this.cdekCarrierProvider.calculateQuote(input);
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        return this.buildLocalB2cQuote(input);
+      }
+
+      throw error;
+    }
+  }
+
+  private buildLocalB2cQuote(input: LogisticsQuoteRequest): LogisticsQuote {
+    const volumetricWeightKg = this.roundWeight((input.lengthCm * input.widthCm * input.heightCm) / 6000);
+    const chargeableWeightKg = this.roundWeight(Math.max(input.weightKg, volumetricWeightKg) * input.packageCount);
+
+    return {
+      id: `local-b2c-quote-${Date.now()}`,
+      cargoType: input.cargoType,
+      destinationCountry: input.destinationCountry,
+      destinationCity: input.destinationCity,
+      deliveryMethod: input.deliveryMethod ?? "TO_DOOR",
+      actualWeightKg: input.weightKg,
+      volumetricWeightKg,
+      chargeableWeightKg,
+      amount: 0,
+      firstMileAmount: 0,
+      lastMileAmount: 0,
+      totalAmount: 0,
+      currency: "CNY",
+      breakdown: [
+        { label: "First mile amount", amount: 0 },
+        { label: "CDEK last-mile amount", amount: 0 },
+        { label: "Total amount", amount: 0 }
+      ]
+    };
+  }
+
+  private async calculateOptionalCdekRouteQuote(input: LogisticsQuoteRequest & { routeId: LogisticsRouteId }): Promise<LogisticsQuote | undefined> {
+    try {
+      return await this.cdekCarrierProvider.calculateQuote(input);
+    } catch (error) {
+      if (error instanceof ServiceUnavailableException) {
+        return undefined;
+      }
+
+      throw error;
+    }
   }
 
   private async buildRouteQuotePrices(input: LogisticsQuoteRequest, quote: LogisticsQuote, configs: LogisticsPricingRouteConfig[]): Promise<LogisticsRouteQuotePrice[]> {
@@ -647,21 +707,33 @@ export class LogisticsService {
       .filter((config) => config.cargoType === "B2C" && config.isActive)
       .sort((current, next) => current.sortOrder - next.sortOrder);
 
-    return Promise.all(
-      activeConfigs.map(async (config) => {
+    const routePrices: Array<LogisticsRouteQuotePrice | undefined> = await Promise.all(
+      activeConfigs.map(async (config): Promise<LogisticsRouteQuotePrice | undefined> => {
         const routeQuote =
           config.routeId === "land-cdek" && config.formula === "cdek_first_last_mile"
-            ? await this.cdekCarrierProvider.calculateQuote({
+            ? await this.cdekCarrierProvider.calculateLandRouteQuote({
                 ...input,
                 routeId: config.routeId,
                 deliveryMethod: input.deliveryMethod ?? config.deliveryMethod
               })
+            : config.formula === "cdek_first_last_mile"
+              ? await this.calculateOptionalCdekRouteQuote({
+                  ...input,
+                  routeId: config.routeId,
+                  deliveryMethod: input.deliveryMethod ?? config.deliveryMethod
+                })
             : quote;
+
+        if (!routeQuote) {
+          return undefined;
+        }
+
         const routeCdekLastMileAmount = routeQuote === quote ? cdekLastMileAmount : routeQuote.totalAmount ?? routeQuote.amount;
         const lastMileAmount =
           config.formula === "cdek_first_last_mile" ? this.convertToCny(routeCdekLastMileAmount, routeQuote.currency, config.rubPerCny ?? 11) : 0;
         const firstMileAmount = this.calculateFirstMileAmount(routeQuote.chargeableWeightKg, config);
         const totalAmount = this.roundMoney(firstMileAmount + lastMileAmount);
+        const includeCdekDetails = config.formula === "cdek_first_last_mile";
 
         return {
           routeId: config.routeId,
@@ -671,10 +743,15 @@ export class LogisticsService {
           firstMileAmount,
           lastMileAmount,
           totalAmount,
-          currency: "CNY" as const
+          currency: "CNY" as const,
+          ...(includeCdekDetails && routeQuote.cdekTariffCode !== undefined ? { cdekTariffCode: routeQuote.cdekTariffCode } : {}),
+          ...(includeCdekDetails && routeQuote.cdekDeliveryMinDays !== undefined ? { cdekDeliveryMinDays: routeQuote.cdekDeliveryMinDays } : {}),
+          ...(includeCdekDetails && routeQuote.cdekDeliveryMaxDays !== undefined ? { cdekDeliveryMaxDays: routeQuote.cdekDeliveryMaxDays } : {})
         };
       })
     );
+
+    return routePrices.filter((routePrice): routePrice is LogisticsRouteQuotePrice => Boolean(routePrice));
   }
 
   private calculateFirstMileAmount(weightKg: number, config: LogisticsPricingRouteConfig) {
@@ -710,6 +787,10 @@ export class LogisticsService {
     return Math.round(value * 100) / 100;
   }
 
+  private roundWeight(value: number) {
+    return Math.round(value * 100) / 100;
+  }
+
   private generateOrderIdentity(routeId: LogisticsRouteId = "air-cdek") {
     const now = new Date();
     const timestamp = [
@@ -732,6 +813,9 @@ export class LogisticsService {
 
   private toQuoteSnapshot(quote: LogisticsQuote, routeId?: LogisticsRouteId): LogisticsQuoteSnapshot {
     const routePrice = routeId ? quote.routePrices?.find((price) => price.routeId === routeId) : undefined;
+    const cdekTariffCode = routePrice?.cdekTariffCode ?? quote.cdekTariffCode;
+    const cdekDeliveryMinDays = routePrice?.cdekDeliveryMinDays ?? quote.cdekDeliveryMinDays;
+    const cdekDeliveryMaxDays = routePrice?.cdekDeliveryMaxDays ?? quote.cdekDeliveryMaxDays;
 
     return {
       deliveryMethod: quote.deliveryMethod,
@@ -743,9 +827,9 @@ export class LogisticsService {
       lastMileAmount: routePrice?.lastMileAmount ?? quote.lastMileAmount,
       totalAmount: routePrice?.totalAmount ?? quote.totalAmount,
       currency: routePrice?.currency ?? quote.currency,
-      ...(quote.cdekTariffCode ? { cdekTariffCode: quote.cdekTariffCode } : {}),
-      ...(quote.cdekDeliveryMinDays !== undefined ? { cdekDeliveryMinDays: quote.cdekDeliveryMinDays } : {}),
-      ...(quote.cdekDeliveryMaxDays !== undefined ? { cdekDeliveryMaxDays: quote.cdekDeliveryMaxDays } : {}),
+      ...(cdekTariffCode !== undefined ? { cdekTariffCode } : {}),
+      ...(cdekDeliveryMinDays !== undefined ? { cdekDeliveryMinDays } : {}),
+      ...(cdekDeliveryMaxDays !== undefined ? { cdekDeliveryMaxDays } : {}),
       ...(quote.exchangeRateNote ? { exchangeRateNote: quote.exchangeRateNote } : {})
     };
   }

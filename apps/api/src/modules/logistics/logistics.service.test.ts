@@ -2,14 +2,15 @@ import assert from "node:assert/strict";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ServiceUnavailableException } from "@nestjs/common";
 
 import { FixedCarrierProvider } from "../carrier/fixed-carrier.provider";
 import { CdekCarrierProvider } from "../carrier/cdek-carrier.provider";
 import { LogisticsService } from "./logistics.service";
-import { defaultLogisticsPricingRouteConfigs, type LogisticsPricingRouteConfig } from "@ground/shared";
+import { defaultLogisticsPricingRouteConfigs, type LogisticsPricingRouteConfig, type LogisticsQuote } from "@ground/shared";
 
 class StubCdekCarrierProvider extends CdekCarrierProvider {
-  override async calculateQuote(input: Parameters<CdekCarrierProvider["calculateQuote"]>[0]) {
+  override async calculateQuote(input: Parameters<CdekCarrierProvider["calculateQuote"]>[0]): Promise<LogisticsQuote> {
     const chargeableWeightKg = input.weightKg < 1 ? input.weightKg : 14.11;
     const routeId = (input as { routeId?: string }).routeId;
     const lastMileAmount = routeId === "land-cdek" ? (input.deliveryMethod === "TO_WAREHOUSE" ? 440 : 550) : 320;
@@ -39,6 +40,36 @@ class StubCdekCarrierProvider extends CdekCarrierProvider {
     };
   }
 
+  override async calculateLandRouteQuote(input: Parameters<CdekCarrierProvider["calculateLandRouteQuote"]>[0]): Promise<LogisticsQuote | undefined> {
+    const deliveryMethod = input.deliveryMethod ?? "TO_DOOR";
+    const lastMileAmount = deliveryMethod === "TO_WAREHOUSE" ? 440 : 550;
+    const tariffCode = deliveryMethod === "TO_WAREHOUSE" ? 136 : 482;
+
+    return {
+      id: "quote-cdek-land-1",
+      cargoType: "B2C" as const,
+      destinationCountry: "Russia" as const,
+      destinationCity: input.destinationCity,
+      deliveryMethod,
+      actualWeightKg: input.weightKg,
+      volumetricWeightKg: 0.01,
+      chargeableWeightKg: input.weightKg < 1 ? input.weightKg : 14.11,
+      amount: lastMileAmount,
+      firstMileAmount: 0,
+      lastMileAmount,
+      totalAmount: lastMileAmount,
+      currency: "RUB" as const,
+      cdekTariffCode: tariffCode,
+      cdekDeliveryMinDays: 3,
+      cdekDeliveryMaxDays: 5,
+      breakdown: [
+        { label: "First mile amount", amount: 0 },
+        { label: "CDEK last-mile amount", amount: lastMileAmount },
+        { label: "Total amount", amount: lastMileAmount }
+      ]
+    };
+  }
+
   override async createOrder() {
     return {
       entityUuid: "cdek-entity-1",
@@ -49,6 +80,18 @@ class StubCdekCarrierProvider extends CdekCarrierProvider {
         errors: [{ message: "По данному направлению при заданных условиях выбранный тариф недоступен" }]
       }
     };
+  }
+}
+
+class UnavailableLandCdekCarrierProvider extends StubCdekCarrierProvider {
+  override async calculateLandRouteQuote() {
+    return undefined;
+  }
+}
+
+class UnavailableAirCdekCarrierProvider extends StubCdekCarrierProvider {
+  override async calculateQuote(): Promise<LogisticsQuote> {
+    throw new ServiceUnavailableException("Selected CDEK tariff is unavailable.");
   }
 }
 
@@ -198,6 +241,57 @@ const run = async () => {
       { routeId: "land-russia-post", firstMileAmount: 797.5, lastMileAmount: 0, totalAmount: 797.5, currency: "CNY" }
     ]
   );
+  assert.equal(pricedQuote.routePrices?.find((route) => route.routeId === "land-cdek")?.cdekTariffCode, 482);
+
+  const unavailableLandService = new LogisticsService(
+    new FixedCarrierProvider(),
+    new UnavailableLandCdekCarrierProvider(),
+    join(isolatedDirectory, "unavailable-land-pricing-orders.json"),
+    createPricingService(defaultLogisticsPricingRouteConfigs) as never
+  );
+  const quoteWithoutLandCdek = await unavailableLandService.createQuote({
+    cargoType: "B2C" as const,
+    destinationCountry: "Russia",
+    destinationCity: "Moscow",
+    deliveryMethod: "TO_DOOR",
+    currency: "CNY",
+    weightKg: 1,
+    lengthCm: 10,
+    widthCm: 10,
+    heightCm: 10,
+    packageCount: 1
+  });
+  const returnedRouteIds = quoteWithoutLandCdek.routePrices?.map((route) => route.routeId) ?? [];
+  assert.equal(returnedRouteIds.includes("land-cdek"), false);
+  assert.equal(returnedRouteIds.includes("air-ems"), true);
+  assert.equal(returnedRouteIds.includes("air-cdek"), true);
+  assert.equal(returnedRouteIds.includes("land-russia-post"), true);
+
+  const unavailableAirService = new LogisticsService(
+    new FixedCarrierProvider(),
+    new UnavailableAirCdekCarrierProvider(),
+    join(isolatedDirectory, "unavailable-air-pricing-orders.json"),
+    createPricingService(defaultLogisticsPricingRouteConfigs) as never
+  );
+  const quoteWithoutAirCdek = await unavailableAirService.createQuote({
+    cargoType: "B2C" as const,
+    destinationCountry: "Russia",
+    destinationCity: "",
+    destinationPostalCode: "630001",
+    destinationAddressLine: "Tverskaya Street 1",
+    deliveryMethod: "TO_DOOR",
+    currency: "CNY",
+    weightKg: 1,
+    lengthCm: 30,
+    widthCm: 20,
+    heightCm: 10,
+    packageCount: 1
+  });
+  const availableRouteIds = quoteWithoutAirCdek.routePrices?.map((route) => route.routeId) ?? [];
+  assert.equal(availableRouteIds.includes("air-cdek"), false);
+  assert.equal(availableRouteIds.includes("air-ems"), true);
+  assert.equal(availableRouteIds.includes("land-cdek"), true);
+  assert.equal(availableRouteIds.includes("land-russia-post"), true);
 
   const lightPricedQuote = await customPricingService.createQuote({
     cargoType: "B2C" as const,
@@ -244,6 +338,8 @@ const run = async () => {
   const landWarehouseRoute = warehousePricedQuote.routePrices?.find((route) => route.routeId === "land-cdek");
   assert.equal(landDoorRoute?.lastMileAmount, 55);
   assert.equal(landWarehouseRoute?.lastMileAmount, 44);
+  assert.equal(landDoorRoute?.cdekTariffCode, 482);
+  assert.equal(landWarehouseRoute?.cdekTariffCode, 136);
 
   const createOrderInput = {
     ownerEmail: "Customer@Example.com",
@@ -315,6 +411,17 @@ const run = async () => {
     cdekDeliveryMinDays: 1,
     cdekDeliveryMaxDays: 2
   });
+
+  const landCreated = await service.createOrder({
+    ...createOrderInput,
+    ownerEmail: "land@example.com",
+    routeId: "land-cdek",
+    deliveryMethod: "TO_DOOR"
+  });
+  assert.equal(landCreated.cdekTariffCode, 482);
+  assert.equal(landCreated.estimatedQuote?.cdekTariffCode, 482);
+  assert.equal(landCreated.estimatedQuote?.cdekDeliveryMinDays, 3);
+  assert.equal(landCreated.estimatedQuote?.cdekDeliveryMaxDays, 5);
   const otherOrder = await service.createOrder({
     ...createOrderInput,
     ownerEmail: "other@example.com"

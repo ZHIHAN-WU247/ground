@@ -459,6 +459,9 @@ export interface LogisticsRouteQuotePrice {
   lastMileAmount: number;
   totalAmount: number;
   currency: CurrencyCode;
+  cdekTariffCode?: number;
+  cdekDeliveryMinDays?: number;
+  cdekDeliveryMaxDays?: number;
 }
 
 export interface LogisticsQuote {

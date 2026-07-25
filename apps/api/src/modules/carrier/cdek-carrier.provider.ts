@@ -47,6 +47,13 @@ interface CdekCalculateQuoteInput extends LogisticsQuoteRequest {
   tariffCode?: number;
 }
 
+interface CdekTariffCandidate {
+  tariffCode: number;
+  amount: number;
+  periodMin: number | undefined;
+  periodMax: number | undefined;
+}
+
 type CdekLocationAddress = LogisticsOrder["sender"] & {
   locationCode?: string;
   fiasGuid?: string;
@@ -100,6 +107,8 @@ const cdekWarehouseToWarehouseTariffCode = 136;
 const cdekWarehouseToDoorTariffCode = 137;
 const cdekEconomyWarehouseToWarehouseTariffCode = 234;
 const cdekEconomyWarehouseToDoorTariffCode = 233;
+const cdekLandDoorTariffCodes = [cdekEconomyWarehouseToDoorTariffCode, cdekWarehouseToDoorTariffCode, 294, 482, 750];
+const cdekLandWarehouseTariffCodes = [cdekEconomyWarehouseToWarehouseTariffCode, cdekWarehouseToWarehouseTariffCode, 291, 483, 751];
 
 const cdekMoscowOrigin: Required<Pick<CdekLocationAddress, "country" | "province" | "city" | "postalCode" | "addressLine" | "locationCode" | "fiasGuid">> = {
   country: "Russia",
@@ -212,35 +221,49 @@ export class CdekCarrierProvider {
     const currency = cdekCurrency ?? "RUB";
     const deliverySum = this.getNumber(response.delivery_sum);
     const totalSum = this.getNumber(response.total_sum) ?? deliverySum;
-    const lastMileAmount = this.roundMoney(totalSum ?? 0);
-    const volumetricWeightKg = this.roundWeight((resolvedInput.lengthCm * resolvedInput.widthCm * resolvedInput.heightCm) / 6000);
-    const weightCalc = this.getNumber(response.weight_calc);
-    const chargeableWeightKg = this.roundWeight(weightCalc ? weightCalc / 1000 : Math.max(resolvedInput.weightKg, volumetricWeightKg) * resolvedInput.packageCount);
-    const periodMin = this.getNumber(response.period_min);
-    const periodMax = this.getNumber(response.period_max);
-    const quote: LogisticsQuote = {
-      id: `cdek-quote-${Date.now()}`,
-      cargoType: resolvedInput.cargoType,
-      destinationCountry: resolvedInput.destinationCountry,
-      destinationCity: resolvedInput.destinationCity,
-      deliveryMethod: resolvedInput.deliveryMethod ?? "TO_DOOR",
-      actualWeightKg: resolvedInput.weightKg,
-      volumetricWeightKg,
-      chargeableWeightKg,
-      amount: lastMileAmount,
-      firstMileAmount: 0,
-      lastMileAmount,
-      totalAmount: lastMileAmount,
+    const quote = this.buildQuoteFromCalculatorResult(resolvedInput, {
+      amount: totalSum ?? 0,
       currency,
-      cdekTariffCode: tariffCode,
-      ...(periodMin !== undefined ? { cdekDeliveryMinDays: periodMin } : {}),
-      ...(periodMax !== undefined ? { cdekDeliveryMaxDays: periodMax } : {}),
-      breakdown: [
-        { label: "First mile amount", amount: 0 },
-        { label: "CDEK last-mile amount", amount: lastMileAmount },
-        { label: "Total amount", amount: lastMileAmount }
-      ]
-    };
+      tariffCode,
+      periodMin: this.getNumber(response.period_min),
+      periodMax: this.getNumber(response.period_max),
+      weightCalc: this.getNumber(response.weight_calc)
+    });
+
+    if (resolvedInput.currency !== currency) {
+      quote.exchangeRateNote = `CDEK returned the carrier price in ${currency}.`;
+    }
+
+    return quote;
+  }
+
+  async calculateLandRouteQuote(input: CdekCalculateQuoteInput): Promise<LogisticsQuote | undefined> {
+    const resolvedInput = await this.resolveQuoteDestination({
+      ...input,
+      routeId: "land-cdek",
+      deliveryMethod: input.deliveryMethod ?? "TO_DOOR"
+    });
+    const response = await this.cdekFetch<Record<string, unknown>>("/v2/calculator/tarifflist", {
+      method: "POST",
+      body: this.buildTariffListPayload(resolvedInput)
+    });
+    const tariffCodes = Array.isArray(response.tariff_codes) ? response.tariff_codes : [];
+    const candidate = this.selectLandTariffCandidate(resolvedInput.deliveryMethod ?? "TO_DOOR", tariffCodes);
+
+    if (!candidate) {
+      return undefined;
+    }
+
+    const cdekCurrency = this.mapCdekCurrency(this.getString(response.currency));
+    const currency = cdekCurrency ?? "RUB";
+    const quote = this.buildQuoteFromCalculatorResult(resolvedInput, {
+      amount: candidate.amount,
+      currency,
+      tariffCode: candidate.tariffCode,
+      periodMin: candidate.periodMin,
+      periodMax: candidate.periodMax,
+      weightCalc: this.getNumber(response.weight_calc)
+    });
 
     if (resolvedInput.currency !== currency) {
       quote.exchangeRateNote = `CDEK returned the carrier price in ${currency}.`;
@@ -561,6 +584,75 @@ export class CdekCarrierProvider {
     };
   }
 
+  private buildTariffListPayload(input: CdekCalculateQuoteInput) {
+    const { tariff_code: _tariffCode, ...payload } = this.buildCalculatorPayload(input);
+    return payload;
+  }
+
+  private buildQuoteFromCalculatorResult(
+    input: CdekCalculateQuoteInput,
+    result: {
+      amount: number;
+      currency: CurrencyCode;
+      tariffCode: number;
+      periodMin: number | undefined;
+      periodMax: number | undefined;
+      weightCalc: number | undefined;
+    }
+  ): LogisticsQuote {
+    const lastMileAmount = this.roundMoney(result.amount);
+    const volumetricWeightKg = this.roundWeight((input.lengthCm * input.widthCm * input.heightCm) / 6000);
+    const chargeableWeightKg = this.roundWeight(result.weightCalc ? result.weightCalc / 1000 : Math.max(input.weightKg, volumetricWeightKg) * input.packageCount);
+
+    return {
+      id: `cdek-quote-${Date.now()}`,
+      cargoType: input.cargoType,
+      destinationCountry: input.destinationCountry,
+      destinationCity: input.destinationCity,
+      deliveryMethod: input.deliveryMethod ?? "TO_DOOR",
+      actualWeightKg: input.weightKg,
+      volumetricWeightKg,
+      chargeableWeightKg,
+      amount: lastMileAmount,
+      firstMileAmount: 0,
+      lastMileAmount,
+      totalAmount: lastMileAmount,
+      currency: result.currency,
+      cdekTariffCode: result.tariffCode,
+      ...(result.periodMin !== undefined ? { cdekDeliveryMinDays: result.periodMin } : {}),
+      ...(result.periodMax !== undefined ? { cdekDeliveryMaxDays: result.periodMax } : {}),
+      breakdown: [
+        { label: "First mile amount", amount: 0 },
+        { label: "CDEK last-mile amount", amount: lastMileAmount },
+        { label: "Total amount", amount: lastMileAmount }
+      ]
+    };
+  }
+
+  private selectLandTariffCandidate(deliveryMethod: NonNullable<CdekCalculateQuoteInput["deliveryMethod"]>, tariffCodes: unknown[]): CdekTariffCandidate | undefined {
+    const allowedTariffCodes = new Set(deliveryMethod === "TO_WAREHOUSE" ? cdekLandWarehouseTariffCodes : cdekLandDoorTariffCodes);
+    const candidates = tariffCodes
+      .map((item) => {
+        const tariff = this.getRecord(item);
+        const tariffCode = this.getNumber(tariff.tariff_code);
+        const amount = this.getNumber(tariff.delivery_sum) ?? this.getNumber(tariff.total_sum);
+
+        if (tariffCode === undefined || amount === undefined || !allowedTariffCodes.has(tariffCode)) {
+          return undefined;
+        }
+
+        return {
+          tariffCode,
+          amount,
+          periodMin: this.getNumber(tariff.period_min),
+          periodMax: this.getNumber(tariff.period_max)
+        };
+      })
+      .filter((candidate): candidate is CdekTariffCandidate => Boolean(candidate));
+
+    return candidates.sort((current, next) => current.amount - next.amount)[0];
+  }
+
   private async resolveQuoteDestination(input: CdekCalculateQuoteInput): Promise<CdekCalculateQuoteInput> {
     if (input.destinationLocationCode || input.destinationFiasGuid) {
       return input;
@@ -575,11 +667,13 @@ export class CdekCarrierProvider {
         postalCode,
         size: 5
       });
-      const postalMatch = this.selectCityMatch(input.destinationCity, postalMatches);
+      const postalMatch = this.selectPostalCityMatch(input.destinationCity, postalMatches);
 
       if (postalMatch) {
         return this.applyCityMatch(input, postalMatch);
       }
+
+      throw new BadRequestException(`Destination postal code ${postalCode} is unsupported or could not be identified by CDEK.`);
     }
 
     const cityMatches = await this.findCdekCities({
@@ -631,6 +725,10 @@ export class CdekCarrierProvider {
     const exactMatches = matches.filter((match) => this.normalizeCityName(match.city) === normalizedDestination);
 
     return exactMatches.length === 1 ? exactMatches[0] : undefined;
+  }
+
+  private selectPostalCityMatch(destinationCity: string, matches: CdekCityMatch[]) {
+    return this.selectCityMatch(destinationCity, matches) ?? matches[0];
   }
 
   private applyCityMatch(input: CdekCalculateQuoteInput, match: CdekCityMatch): CdekCalculateQuoteInput {
@@ -691,7 +789,7 @@ export class CdekCarrierProvider {
   }
 
   private isWarehouseToWarehouseTariff(tariffCode: number) {
-    return tariffCode === cdekWarehouseToWarehouseTariffCode || tariffCode === cdekEconomyWarehouseToWarehouseTariffCode;
+    return cdekLandWarehouseTariffCodes.includes(tariffCode);
   }
 
   private async resolveDeliveryPointCode(address: CdekLocationAddress, role: "sender" | "recipient") {
